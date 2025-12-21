@@ -1,0 +1,7 @@
+package-as: CVarMaster
+
+ignore:
+  - README.md
+  - CHANGELOG.md
+  - .git
+  - .gitignore
