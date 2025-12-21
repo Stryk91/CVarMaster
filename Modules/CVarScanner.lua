@@ -111,7 +111,16 @@ function Scanner:ScanAll()
     
     if CVarMaster.CVarMappings then
         for cvarName, mapping in pairs(CVarMaster.CVarMappings) do
-            if not cvarCache[cvarName] then
+            if cvarCache[cvarName] then
+                -- Already cached - apply overrides from CVarMappings
+                if mapping.category then
+                    cvarCache[cvarName].category = mapping.category
+                end
+                if mapping.friendlyName then
+                    cvarCache[cvarName].friendlyName = mapping.friendlyName
+                end
+            else
+                -- Not cached - scan and apply
                 local data = ScanCVar(cvarName)
                 if data then
                     data.friendlyName = mapping.friendlyName or data.friendlyName

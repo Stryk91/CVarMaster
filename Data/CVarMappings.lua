@@ -303,6 +303,99 @@ CVarMaster.CVarMappings = {
         category = "Interface",
         basicWidget = "checkbox",
     },
+
+
+    -- Network (Additional)
+    ["useIPv6"] = {
+        friendlyName = "Use IPv6",
+        description = "Enable IPv6 network connections",
+        category = "Network",
+        basicWidget = "checkbox",
+    },
+
+    ["disableServerNagle"] = {
+        friendlyName = "Disable Nagle Algorithm",
+        description = "Disable TCP Nagle algorithm for lower latency (may increase bandwidth)",
+        category = "Network",
+        basicWidget = "checkbox",
+    },
+
+    ["disableAutoRealmSelect"] = {
+        friendlyName = "Disable Auto Realm Select",
+        description = "Prevent automatic realm selection",
+        category = "Network",
+        basicWidget = "checkbox",
+    },
+
+    ["gxFixLag"] = {
+        friendlyName = "Fix Graphics Lag",
+        description = "Reduce input lag by modifying render queue",
+        category = "Network",
+        basicWidget = "checkbox",
+    },
+
+    ["gxMaxFrameLatency"] = {
+        friendlyName = "Max Frame Latency",
+        description = "Maximum frames to queue (lower = less input lag, higher = smoother)",
+        category = "Graphics",
+        basicWidget = "slider",
+        basicMin = 1,
+        basicMax = 6,
+        basicLabels = { "1 (Low Latency)", "3 (Balanced)", "6 (Smooth)" },
+    },
+
+    ["initialRealmListTimeout"] = {
+        friendlyName = "Realm List Timeout",
+        description = "Timeout for initial realm list fetch (seconds)",
+        category = "Network",
+        basicWidget = "slider",
+        basicMin = 5,
+        basicMax = 60,
+    },
+
+    ["serverAlert"] = {
+        friendlyName = "Server Alerts",
+        description = "Show server alert messages",
+        category = "Network",
+        basicWidget = "checkbox",
+    },
+    -- FFX (Full Screen Effects)
+    ["ffxGlow"] = {
+        friendlyName = "FFX Glow",
+        description = "Full screen glow effect",
+        category = "Graphics",
+        basicWidget = "checkbox",
+    },
+
+    ["ffxNether"] = {
+        friendlyName = "FFX Nether",
+        description = "Full screen nether/glow effect",
+        category = "Graphics",
+        basicWidget = "checkbox",
+    },
+
+    ["ffxDeath"] = {
+        friendlyName = "FFX Death",
+        description = "Full screen death effect",
+        category = "Graphics",
+        basicWidget = "checkbox",
+    },
+
+    ["ffxAntiAliasingMode"] = {
+        friendlyName = "FFX Anti-Aliasing Mode",
+        description = "Full screen anti-aliasing mode",
+        category = "Graphics",
+        basicWidget = "dropdown",
+        basicOptions = { "0", "1", "2", "3" },
+        basicLabels = { "Off", "Low", "Medium", "High" },
+    },
+
+    ["ffxRectangle"] = {
+        friendlyName = "FFX Rectangle",
+        description = "Use rectangle texture for full screen effects",
+        category = "Graphics",
+        basicWidget = "checkbox",
+    },
 }
 
 -- Store in global namespace

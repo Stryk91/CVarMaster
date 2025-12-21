@@ -42,6 +42,8 @@ CVarMaster.CVarCategories = {
     -- Network
     Network = {
         "network", "lag", "latency", "SpellQueue", "reducedLag",
+        "nagle", "realm", "server", "ipv6", "ipv4", "timeout",
+        "frameLatency", "gxFixLag",
     },
 
     -- Performance
