@@ -1,0 +1,38 @@
+## Interface: 110002
+## Title: |cff00aaffCVar|r|cffffffffMaster|r
+## Notes: The definitive CVar management and configuration tool
+## Author: Stryker
+## Version: 1.0.0
+## SavedVariables: CVarMasterDB
+## SavedVariablesPerCharacter: CVarMasterCharDB
+
+# Core
+Core\Constants.lua
+Core\Utils.lua
+Core\Database.lua
+
+# Data - CVar mappings and categorization
+Data\KnownCVars.lua
+Data\CombatProtected.lua
+Data\CVarCategories.lua
+Data\CVarMappings.lua
+Data\CVarDescriptions.lua
+Data\DangerousCVars.lua
+
+# CVar Management
+Modules\CVarScanner.lua
+Modules\CVarManager.lua
+Modules\ProfileManager.lua
+Modules\SafetyManager.lua
+
+# GUI Components
+GUI\Framework.lua
+GUI\MainWindow.lua
+GUI\CategoryPanel.lua
+GUI\CVarEditor.lua
+GUI\SearchPanel.lua
+GUI\ProfilePanel.lua
+GUI\ComparisonView.lua
+
+# Main
+CVarMaster.lua
