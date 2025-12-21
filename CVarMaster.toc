@@ -2,7 +2,7 @@
 ## Title: |cff00aaffCVar|r|cffffffffMaster|r
 ## Notes: The definitive CVar management and configuration tool
 ## Author: Stryker
-## Version: 1.0.0
+## Version: 1.0.1
 ## SavedVariables: CVarMasterDB
 ## SavedVariablesPerCharacter: CVarMasterCharDB
 
