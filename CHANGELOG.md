@@ -1,3 +1,16 @@
+# CVarMaster Changelog
+
+## [1.1.0] - 2025-12-23
+
+### Added
+- Human-readable display names for all 893 CVars
+- CVars now show friendly names like "Camera FOV Smooth Speed" instead of raw syntax
+- Complete tooltip descriptions for all CVars
+
+### Improved
+- Alphabetically sorted CVar entries for easier maintenance
+- Better acronym handling (FOV, SSAO, NPC, etc.)
+
 # Changelog
 
 ## [1.0.1] - 2024-12-22
