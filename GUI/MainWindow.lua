@@ -8,6 +8,21 @@ local MainWindow = nil
 local isInitialized = false
 local currentScale = 1.0
 
+-- Local theme helper
+local function T(key)
+    if Constants and Constants.THEME and Constants.THEME[key] then
+        return unpack(Constants.THEME[key])
+    end
+    return 0.5, 0.5, 0.5, 1.0
+end
+
+local function S(key)
+    if Constants and Constants.SPACING then
+        return Constants.SPACING[key] or 8
+    end
+    return 8
+end
+
 function GUI:InitMainWindow()
     if isInitialized then return end
     
@@ -15,10 +30,12 @@ function GUI:InitMainWindow()
     
     local C = Constants.GUI
     
-    -- Create main frame
-    MainWindow = GUI:CreateFrame("CVarMasterMainWindow", UIParent, C.WINDOW_WIDTH, C.WINDOW_HEIGHT)
+    -- Create main frame with modern backdrop
+    MainWindow = GUI:CreateFrame("CVarMasterMainWindow", UIParent, C.WINDOW_WIDTH, C.WINDOW_HEIGHT, true)
     if not MainWindow then return end
     
+    MainWindow:SetBackdropColor(T("BG_PRIMARY"))
+    MainWindow:SetBackdropBorderColor(T("BORDER_DEFAULT"))
     MainWindow:SetPoint("CENTER")
     MainWindow:SetMovable(true)
     MainWindow:EnableMouse(true)
@@ -31,48 +48,48 @@ function GUI:InitMainWindow()
     
     -- Title bar
     local titleBar = CreateFrame("Frame", nil, MainWindow, "BackdropTemplate")
-    titleBar:SetHeight(32)
-    titleBar:SetPoint("TOPLEFT", 0, 0)
-    titleBar:SetPoint("TOPRIGHT", 0, 0)
+    titleBar:SetHeight(36)
+    titleBar:SetPoint("TOPLEFT", 4, -4)
+    titleBar:SetPoint("TOPRIGHT", -4, -4)
     titleBar:SetBackdrop({
         bgFile = "Interface\\Buttons\\WHITE8x8",
         edgeFile = "Interface\\Buttons\\WHITE8x8",
         edgeSize = 1,
     })
-    titleBar:SetBackdropColor(0.1, 0.3, 0.1, 0.95)
-    titleBar:SetBackdropBorderColor(0, 0.8, 0, 0.8)
+    titleBar:SetBackdropColor(T("TITLEBAR_BG"))
+    titleBar:SetBackdropBorderColor(T("TITLEBAR_BORDER"))
     
     -- Title text
-    local title = titleBar:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    title:SetPoint("LEFT", 12, 0)
-    title:SetText("|cff00aaffCVar|r|cffffffffMaster|r")
+    local title = titleBar:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    title:SetPoint("LEFT", S("LG"), 0)
+    title:SetText("|cff5BD663CVar|r|cffE8EBE8Master|r")
     
     -- Version
     local version = titleBar:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    version:SetPoint("LEFT", title, "RIGHT", 8, 0)
+    version:SetPoint("LEFT", title, "RIGHT", S("SM"), 0)
     version:SetText("v" .. Constants.VERSION)
-    version:SetTextColor(0.5, 0.5, 0.5)
+    version:SetTextColor(T("TEXT_MUTED"))
     
     -- Close button
-    local closeBtn = GUI:CreateButton(nil, titleBar, "X", 28, 28)
-    closeBtn:SetPoint("RIGHT", -2, 0)
+    local closeBtn = GUI:CreateButton(nil, titleBar, "X", 30, 30)
+    closeBtn:SetPoint("RIGHT", -S("XS"), 0)
     closeBtn:SetScript("OnClick", function() MainWindow:Hide() end)
     
-    -- ========== SCALE SLIDER (using OptionsSliderTemplate) ==========
+    -- ========== SCALE SLIDER ==========
     local scaleContainer = CreateFrame("Frame", nil, titleBar)
-    scaleContainer:SetSize(160, 28)
-    scaleContainer:SetPoint("RIGHT", closeBtn, "LEFT", -16, 0)
+    scaleContainer:SetSize(170, 30)
+    scaleContainer:SetPoint("RIGHT", closeBtn, "LEFT", -S("LG"), 0)
     
     -- Scale label
-    local scaleLabel = scaleContainer:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local scaleLabel = scaleContainer:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     scaleLabel:SetPoint("LEFT", 0, 0)
     scaleLabel:SetText("Scale:")
-    scaleLabel:SetTextColor(0.7, 0.7, 0.7)
+    scaleLabel:SetTextColor(T("TEXT_SECONDARY"))
     
     -- Use proper WoW slider template
     local scaleSlider = CreateFrame("Slider", "CVarMasterScaleSlider", scaleContainer, "OptionsSliderTemplate")
-    scaleSlider:SetSize(80, 17)
-    scaleSlider:SetPoint("LEFT", scaleLabel, "RIGHT", 8, 0)
+    scaleSlider:SetSize(85, 17)
+    scaleSlider:SetPoint("LEFT", scaleLabel, "RIGHT", S("SM"), 0)
     scaleSlider:SetMinMaxValues(60, 140)
     scaleSlider:SetValueStep(5)
     scaleSlider:SetObeyStepOnDrag(true)
@@ -83,11 +100,11 @@ function GUI:InitMainWindow()
     scaleSlider.Text:SetText("")
     
     -- Scale value display
-    local scaleValue = scaleContainer:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    scaleValue:SetPoint("LEFT", scaleSlider, "RIGHT", 6, 0)
-    scaleValue:SetWidth(35)
+    local scaleValue = scaleContainer:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    scaleValue:SetPoint("LEFT", scaleSlider, "RIGHT", S("SM"), 0)
+    scaleValue:SetWidth(40)
     scaleValue:SetJustifyH("LEFT")
-    scaleValue:SetTextColor(0.8, 1, 0.8)
+    scaleValue:SetTextColor(T("TEXT_ACCENT"))
     MainWindow.scaleValue = scaleValue
     
     -- Load saved scale
@@ -100,9 +117,8 @@ function GUI:InitMainWindow()
     scaleValue:SetText(savedScale .. "%")
     MainWindow:SetScale(currentScale)
     
-    -- Only update on mouse up to prevent spazzing
     scaleSlider:SetScript("OnValueChanged", function(self, value)
-        value = math.floor(value / 5 + 0.5) * 5 -- Round to nearest 5
+        value = math.floor(value / 5 + 0.5) * 5
         scaleValue:SetText(value .. "%")
     end)
     
@@ -111,13 +127,11 @@ function GUI:InitMainWindow()
         currentScale = value / 100
         MainWindow:SetScale(currentScale)
         
-        -- Save to DB
         if CVarMaster.db and CVarMaster.db.global then
             CVarMaster.db.global.windowScale = currentScale
         end
     end)
     
-    -- Tooltip
     scaleSlider:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
         GameTooltip:SetText("Window Scale", 1, 1, 1)
@@ -128,28 +142,28 @@ function GUI:InitMainWindow()
     scaleSlider:SetScript("OnLeave", function() GameTooltip:Hide() end)
     
     MainWindow.scaleSlider = scaleSlider
-    -- ========== END SCALE SLIDER ==========
     
     -- Content area
     local content = CreateFrame("Frame", nil, MainWindow)
-    content:SetPoint("TOPLEFT", 0, -32)
-    content:SetPoint("BOTTOMRIGHT", 0, 0)
+    content:SetPoint("TOPLEFT", 4, -44)
+    content:SetPoint("BOTTOMRIGHT", -4, 4)
     MainWindow.content = content
     
     -- Left sidebar
     local sidebar = GUI:CreateFrame(nil, content, C.CATEGORY_WIDTH, 1)
-    sidebar:SetPoint("TOPLEFT", 4, -4)
-    sidebar:SetPoint("BOTTOMLEFT", 4, 4)
-    sidebar:SetBackdropColor(0.03, 0.03, 0.05, 0.9)
+    sidebar:SetPoint("TOPLEFT", S("XS"), -S("XS"))
+    sidebar:SetPoint("BOTTOMLEFT", S("XS"), S("XS"))
+    sidebar:SetBackdropColor(T("BG_SECONDARY"))
+    sidebar:SetBackdropBorderColor(T("BORDER_SUBTLE"))
     MainWindow.sidebar = sidebar
     
     -- Search box
-    local searchBox = GUI:CreateEditBox("CVarMasterSearch", sidebar, C.CATEGORY_WIDTH - 16, 26)
-    searchBox:SetPoint("TOPLEFT", 8, -8)
-    searchBox:SetPoint("TOPRIGHT", -8, -8)
+    local searchBox = GUI:CreateEditBox("CVarMasterSearch", sidebar, C.CATEGORY_WIDTH - S("LG"), C.SEARCH_HEIGHT)
+    searchBox:SetPoint("TOPLEFT", S("SM"), -S("SM"))
+    searchBox:SetPoint("TOPRIGHT", -S("SM"), -S("SM"))
     
-    local searchIcon = sidebar:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    searchIcon:SetPoint("LEFT", searchBox, "LEFT", 6, 0)
+    local searchIcon = sidebar:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    searchIcon:SetPoint("LEFT", searchBox, "LEFT", S("SM"), 0)
     searchIcon:SetText("|cff666666Search...|r")
     searchBox.placeholder = searchIcon
     
@@ -169,46 +183,46 @@ function GUI:InitMainWindow()
     
     -- Right panel
     local rightPanel = CreateFrame("Frame", nil, content)
-    rightPanel:SetPoint("TOPLEFT", sidebar, "TOPRIGHT", 4, 0)
-    rightPanel:SetPoint("BOTTOMRIGHT", -4, 4)
+    rightPanel:SetPoint("TOPLEFT", sidebar, "TOPRIGHT", S("XS"), 0)
+    rightPanel:SetPoint("BOTTOMRIGHT", -S("XS"), S("XS"))
     MainWindow.rightPanel = rightPanel
     
     -- CVar list
     local listContainer, listContent = GUI:CreateScrollFrame("CVarMasterList", rightPanel, 
-        C.WINDOW_WIDTH - C.CATEGORY_WIDTH - 20, C.WINDOW_HEIGHT - 80)
-    listContainer:SetPoint("TOPLEFT", 0, -4)
-    listContainer:SetPoint("BOTTOMRIGHT", 0, 40)
+        C.WINDOW_WIDTH - C.CATEGORY_WIDTH - 32, C.WINDOW_HEIGHT - 100)
+    listContainer:SetPoint("TOPLEFT", 0, -S("XS"))
+    listContainer:SetPoint("BOTTOMRIGHT", 0, 44)
     MainWindow.listContainer = listContainer
     MainWindow.listContent = listContent
     
     -- Bottom bar
     local bottomBar = CreateFrame("Frame", nil, rightPanel)
-    bottomBar:SetHeight(36)
+    bottomBar:SetHeight(40)
     bottomBar:SetPoint("BOTTOMLEFT", 0, 0)
     bottomBar:SetPoint("BOTTOMRIGHT", 0, 0)
     
-    local status = bottomBar:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    status:SetPoint("LEFT", 8, 0)
-    status:SetTextColor(0.6, 0.6, 0.6)
+    local status = bottomBar:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    status:SetPoint("LEFT", S("SM"), 0)
+    status:SetTextColor(T("TEXT_SECONDARY"))
     MainWindow.status = status
     
-    local scanBtn = GUI:CreateButton(nil, bottomBar, "Rescan", 70, 26)
-    scanBtn:SetPoint("RIGHT", -8, 0)
+    local scanBtn = GUI:CreateButton(nil, bottomBar, "Rescan", 80, C.BUTTON_HEIGHT)
+    scanBtn:SetPoint("RIGHT", -S("SM"), 0)
     scanBtn:SetScript("OnClick", function()
         CVarMaster.CVarScanner:RefreshCache()
         GUI:RefreshCVarList()
     end)
     
-    local backupBtn = GUI:CreateButton(nil, bottomBar, "Backup", 70, 26)
-    backupBtn:SetPoint("RIGHT", scanBtn, "LEFT", -4, 0)
+    local backupBtn = GUI:CreateButton(nil, bottomBar, "Backup", 80, C.BUTTON_HEIGHT)
+    backupBtn:SetPoint("RIGHT", scanBtn, "LEFT", -S("SM"), 0)
     backupBtn:SetScript("OnClick", function()
         if CVarMaster.CVarManager then
             CVarMaster.CVarManager:BackupAll()
         end
     end)
     
-    local modifiedBtn = GUI:CreateButton(nil, bottomBar, "Modified Only", 90, 26)
-    modifiedBtn:SetPoint("RIGHT", backupBtn, "LEFT", -4, 0)
+    local modifiedBtn = GUI:CreateButton(nil, bottomBar, "Modified Only", 100, C.BUTTON_HEIGHT)
+    modifiedBtn:SetPoint("RIGHT", backupBtn, "LEFT", -S("SM"), 0)
     modifiedBtn.showModified = false
     modifiedBtn:SetScript("OnClick", function(self)
         self.showModified = not self.showModified
@@ -263,5 +277,3 @@ end
 function GUI:GetMainWindow()
     return MainWindow
 end
-
-

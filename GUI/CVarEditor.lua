@@ -7,63 +7,80 @@ local Constants = CVarMaster.Constants
 -- Pool of reusable row frames
 local rowPool = {}
 local activeRows = {}
-local ROW_HEIGHT = 28
+
+-- Local theme helpers
+local function T(key)
+    if Constants and Constants.THEME and Constants.THEME[key] then
+        return unpack(Constants.THEME[key])
+    end
+    return 0.5, 0.5, 0.5, 1.0
+end
+
+local function S(key)
+    if Constants and Constants.SPACING then
+        return Constants.SPACING[key] or 8
+    end
+    return 8
+end
+
+local function GetRowHeight()
+    return (Constants and Constants.GUI and Constants.GUI.ROW_HEIGHT) or 24
+end
 
 ---Create a CVar row
 ---@param parent Frame Parent frame
 ---@param index number Row index
 ---@return Frame row
 local function CreateRow(parent, index)
+    local ROW_HEIGHT = GetRowHeight()
+    
     local row = CreateFrame("Frame", nil, parent, "BackdropTemplate")
     row:SetHeight(ROW_HEIGHT)
     row:SetBackdrop({
         bgFile = "Interface\\Buttons\\WHITE8x8",
     })
     
-    -- Alternating row colors
-    row.normalColor = (index % 2 == 0) and {0.06, 0.06, 0.08, 0.8} or {0.04, 0.04, 0.06, 0.8}
+    -- Alternating row colors (softer)
+    if index % 2 == 0 then
+        row.normalColor = { T("ROW_ALT") }
+    else
+        row.normalColor = { 0, 0, 0, 0 }
+    end
     row:SetBackdropColor(unpack(row.normalColor))
     
     -- Hover highlight
     row:EnableMouse(true)
-    row:SetScript("OnEnter", function(self)
-        self:SetBackdropColor(0.1, 0.2, 0.1, 0.9)
-    end)
-    row:SetScript("OnLeave", function(self)
-        self:SetBackdropColor(unpack(self.normalColor))
-    end)
     
-    -- Modified indicator (left edge)
+    -- Modified indicator (left edge) - softer color
     row.modifiedBar = row:CreateTexture(nil, "OVERLAY")
     row.modifiedBar:SetWidth(3)
-    row.modifiedBar:SetPoint("TOPLEFT", 0, 0)
-    row.modifiedBar:SetPoint("BOTTOMLEFT", 0, 0)
-    row.modifiedBar:SetColorTexture(1, 0.8, 0, 1)
+    row.modifiedBar:SetPoint("TOPLEFT", 0, -2)
+    row.modifiedBar:SetPoint("BOTTOMLEFT", 0, 2)
+    row.modifiedBar:SetColorTexture(0.95, 0.75, 0.25, 1)
     row.modifiedBar:Hide()
     
-    -- CVar name (friendly name)
-    row.nameText = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    row.nameText:SetPoint("LEFT", 12, 0)
-    row.nameText:SetWidth(200)
+    -- CVar name (friendly name) - more prominent
+    row.nameText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    row.nameText:SetPoint("LEFT", S("MD"), 0)
+    row.nameText:SetWidth(220)
     row.nameText:SetJustifyH("LEFT")
-    row.nameText:SetTextColor(0.9, 0.9, 0.9)
+    row.nameText:SetTextColor(T("TEXT_PRIMARY"))
     
-    -- Technical name (smaller, gray)
+    -- Technical name (smaller, muted)
     row.techName = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    row.techName:SetPoint("LEFT", row.nameText, "RIGHT", 8, 0)
-    row.techName:SetWidth(150)
+    row.techName:SetPoint("LEFT", row.nameText, "RIGHT", S("SM"), 0)
+    row.techName:SetWidth(160)
     row.techName:SetJustifyH("LEFT")
-    row.techName:SetTextColor(0.4, 0.4, 0.4)
-    row.techName:SetFont(row.techName:GetFont(), 10)
+    row.techName:SetTextColor(T("TEXT_MUTED"))
     
     -- Current value display
-    row.valueText = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    row.valueText:SetPoint("LEFT", row.techName, "RIGHT", 8, 0)
-    row.valueText:SetWidth(80)
+    row.valueText = row:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    row.valueText:SetPoint("LEFT", row.techName, "RIGHT", S("SM"), 0)
+    row.valueText:SetWidth(90)
     row.valueText:SetJustifyH("RIGHT")
     
     -- Value editor (appears on click)
-    row.editBox = GUI:CreateEditBox(nil, row, 80, 20)
+    row.editBox = GUI:CreateEditBox(nil, row, 90, 22)
     row.editBox:SetPoint("LEFT", row.valueText, "LEFT", -4, 0)
     row.editBox:Hide()
     
@@ -92,22 +109,20 @@ local function CreateRow(parent, index)
             self.editBox:SetFocus()
             self.editBox:HighlightText()
         elseif button == "RightButton" and self.cvarData then
-            -- Show context menu
             GUI:ShowCVarContextMenu(self, self.cvarData)
         end
     end)
     
-    -- Default value (smaller text)
+    -- Default value (smaller, muted)
     row.defaultText = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    row.defaultText:SetPoint("LEFT", row.valueText, "RIGHT", 16, 0)
-    row.defaultText:SetWidth(80)
+    row.defaultText:SetPoint("LEFT", row.valueText, "RIGHT", S("MD"), 0)
+    row.defaultText:SetWidth(90)
     row.defaultText:SetJustifyH("RIGHT")
-    row.defaultText:SetTextColor(0.4, 0.4, 0.4)
-    row.defaultText:SetFont(row.defaultText:GetFont(), 10)
+    row.defaultText:SetTextColor(T("TEXT_MUTED"))
     
     -- Reset button
-    row.resetBtn = GUI:CreateButton(nil, row, "Reset", 50, 20)
-    row.resetBtn:SetPoint("LEFT", row.defaultText, "RIGHT", 8, 0)
+    row.resetBtn = GUI:CreateButton(nil, row, "Reset", 55, 22)
+    row.resetBtn:SetPoint("LEFT", row.defaultText, "RIGHT", S("SM"), 0)
     row.resetBtn:Hide()
     row.resetBtn:SetScript("OnClick", function()
         if row.cvarData then
@@ -119,34 +134,44 @@ local function CreateRow(parent, index)
     
     -- Warning icon for dangerous CVars
     row.warningIcon = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    row.warningIcon:SetPoint("RIGHT", -8, 0)
-    row.warningIcon:SetText("|cffff0000!|r")
+    row.warningIcon:SetPoint("RIGHT", -S("SM"), 0)
+    row.warningIcon:SetText("|cffff6644!|r")
     row.warningIcon:Hide()
     
-    -- Tooltip
+    -- Hover/Leave handlers
     row:SetScript("OnEnter", function(self)
-        self:SetBackdropColor(0.1, 0.2, 0.1, 0.9)
+        self:SetBackdropColor(T("ROW_HOVER"))
         if self.cvarData then
             GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
             GameTooltip:ClearLines()
-            GameTooltip:AddLine(self.cvarData.friendlyName, 0, 1, 0)
+            
+            -- Header
+            local r, g, b = T("ACCENT_PRIMARY")
+            GameTooltip:AddLine(self.cvarData.friendlyName, r, g, b)
             GameTooltip:AddLine(self.cvarData.name, 0.5, 0.5, 0.5)
+            
+            -- Description
             if self.cvarData.description and self.cvarData.description ~= "" then
                 GameTooltip:AddLine(" ")
                 GameTooltip:AddLine(self.cvarData.description, 1, 1, 1, true)
             end
+            
+            -- Values
             GameTooltip:AddLine(" ")
             GameTooltip:AddDoubleLine("Current:", self.cvarData.value, 0.7, 0.7, 0.7, 1, 1, 1)
             GameTooltip:AddDoubleLine("Default:", self.cvarData.defaultValue, 0.7, 0.7, 0.7, 0.6, 0.6, 0.6)
             GameTooltip:AddDoubleLine("Type:", self.cvarData.dataType, 0.7, 0.7, 0.7, 0.6, 0.6, 0.6)
+            
+            -- Warnings
             if self.cvarData.requiresReload then
                 GameTooltip:AddLine(" ")
                 GameTooltip:AddLine("|cff8888ffRequires UI Reload|r")
             end
-            if self.cvarData.dangerLevel > 0 then
+            if self.cvarData.dangerLevel and self.cvarData.dangerLevel > 0 then
                 GameTooltip:AddLine(" ")
-                GameTooltip:AddLine("|cffff0000" .. (self.cvarData.dangerWarning or "Use with caution!") .. "|r")
+                GameTooltip:AddLine("|cffff6644" .. (self.cvarData.dangerWarning or "Use with caution!") .. "|r")
             end
+            
             GameTooltip:AddLine(" ")
             GameTooltip:AddLine("|cff888888Left-click to edit, Right-click for options|r")
             GameTooltip:Show()
@@ -183,6 +208,8 @@ end
 ---@param cvarData table CVar data
 ---@param index number Row index
 local function PopulateRow(row, cvarData, index)
+    local ROW_HEIGHT = GetRowHeight()
+    
     row.cvarData = cvarData
     row.index = index
     
@@ -212,13 +239,13 @@ local function PopulateRow(row, cvarData, index)
     -- Default value
     row.defaultText:SetText("(" .. (cvarData.defaultValue or "?") .. ")")
     
-    -- Warning for dangerous CVars
+    -- Warning for dangerous CVars (softer orange instead of red)
     if cvarData.dangerLevel and cvarData.dangerLevel > 0 then
         row.warningIcon:Show()
         if cvarData.dangerLevel >= Constants.DANGER_LEVELS.DANGEROUS then
-            row.warningIcon:SetText("|cffff0000!!|r")
+            row.warningIcon:SetText("|cffff5533!!|r")
         else
-            row.warningIcon:SetText("|cffffaa00!|r")
+            row.warningIcon:SetText("|cffffaa44!|r")
         end
     else
         row.warningIcon:Hide()
@@ -239,6 +266,8 @@ function GUI:RefreshCVarList(searchTerm)
     
     local content = mainWindow.listContent
     if not content then return end
+    
+    local ROW_HEIGHT = GetRowHeight()
     
     -- Get CVars
     local cvars = CVarMaster.CVarScanner:GetCachedCVars()
@@ -303,7 +332,6 @@ function GUI:ShowCVarContextMenu(anchor, cvarData)
     local menu = {
         { text = cvarData.friendlyName, isTitle = true },
         { text = "Copy Name", func = function()
-            -- No clipboard in WoW, just print it
             print("CVar: " .. cvarData.name)
         end },
         { text = "Copy Value", func = function()
@@ -328,12 +356,7 @@ function GUI:ShowCVarContextMenu(anchor, cvarData)
         end })
     end
     
-    -- Use EasyMenu if available, otherwise create simple dropdown
     if EasyMenu then
         EasyMenu(menu, CreateFrame("Frame", nil, anchor, "UIDropDownMenuTemplate"), anchor, 0, 0, "MENU")
     end
 end
-
-
-
-
