@@ -40,7 +40,7 @@ local function Initialize()
     
     -- Scan CVars silently
     if CVarMaster.CVarScanner then
-        CVarMaster.CVarScanner:ScanAllCVars()
+        CVarMaster.CVarScanner:ScanAll()
     end
     
     print("|cff00aaffCVarMaster|r v1.1.0 loaded - Type |cff00ff00/cvm|r to open")
