@@ -894,6 +894,28 @@ CVarMaster.CVarDescriptions = {
     ["WorldTextScreenY"] = "World text screen Y position",
     ["WorldTextStartPosRandomness"] = "World text start position randomness",
     ["xpBarText"] = "Show XP bar text",
+    -- SOFT TARGET SYSTEM (10.0+)
+    ["SoftTargetEnemy"] = "Action targeting for enemies (0=Off, 1=CVars, 2=CVars+ActionButtons, 3=All)",
+    ["SoftTargetFriend"] = "Action targeting for friendlies (0=Off, 1=CVars, 2=CVars+ActionButtons, 3=All)",
+    ["SoftTargetInteract"] = "Action targeting for interactables (0=Off, 1=CVars, 2=CVars+ActionButtons, 3=All)",
+    ["SoftTargetInteractRange"] = "Interaction range for soft targeting (default: 10)",
+    ["SoftTargetNameplateEnemy"] = "Force nameplate on soft-targeted enemy",
+    ["SoftTargetNameplateFriend"] = "Force nameplate on soft-targeted friendly",
+    ["SoftTargetIconEnemy"] = "Show icon above soft-targeted enemies",
+    ["SoftTargetIconFriend"] = "Show icon above soft-targeted friendlies",
+    -- CAMERA FOLLOW (9.0+)
+    ["CameraFollowPitchStrength"] = "Strength of camera pitch following",
+    ["CameraKeepCharacterCentered"] = "Keep character centered as motion reference",
+    -- ADVANCED FLYING (10.0+)
+    ["AdvFlyingDynamicFOVEnabled"] = "Adjust FOV based on gliding speed",
+    -- DELVES (11.0)
+    ["lastRenownForDelvesSeason"] = "Last seen delves season renown",
+    ["lastSelectedDelvesTier"] = "Last selected delves tier",
+    -- PING SYSTEM (10.1+)
+    ["enablePings"] = "Enable the ping system",
+    ["pingCategoryTutorialShown"] = "Ping tutorial shown",
+    -- PREEMPTIVE CAST (11.0+)
+    ["PreemptiveCastEnable"] = "Enable preemptive spell casting",
 }
 
 -- Friendly display names for CVars
@@ -1791,4 +1813,26 @@ CVarMaster.CVarPrettyNames = {
     ["WorldTextScreenY"] = "World Text Screen Y",
     ["WorldTextStartPosRandomness"] = "World Text Start Pos Randomness",
     ["xpBarText"] = "XP Bar Text",
+    -- SOFT TARGET SYSTEM
+    ["SoftTargetEnemy"] = "Soft Target: Enemies",
+    ["SoftTargetFriend"] = "Soft Target: Friendlies",
+    ["SoftTargetInteract"] = "Soft Target: Interactables",
+    ["SoftTargetInteractRange"] = "Soft Target: Interact Range",
+    ["SoftTargetNameplateEnemy"] = "Soft Target: Enemy Nameplate",
+    ["SoftTargetNameplateFriend"] = "Soft Target: Friendly Nameplate",
+    ["SoftTargetIconEnemy"] = "Soft Target: Enemy Icon",
+    ["SoftTargetIconFriend"] = "Soft Target: Friendly Icon",
+    -- CAMERA FOLLOW
+    ["CameraFollowPitchStrength"] = "Camera Follow Pitch",
+    ["CameraKeepCharacterCentered"] = "Keep Character Centered",
+    -- ADVANCED FLYING
+    ["AdvFlyingDynamicFOVEnabled"] = "Dynamic FOV (Flying)",
+    -- DELVES
+    ["lastRenownForDelvesSeason"] = "Delves Season Renown",
+    ["lastSelectedDelvesTier"] = "Delves Tier",
+    -- PING
+    ["enablePings"] = "Enable Pings",
+    ["pingCategoryTutorialShown"] = "Ping Tutorial Shown",
+    -- PREEMPTIVE CAST
+    ["PreemptiveCastEnable"] = "Preemptive Cast",
 }

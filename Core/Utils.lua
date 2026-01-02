@@ -124,20 +124,27 @@ function Utils.GetCVarColor(cvarData)
     return c.r, c.g, c.b
 end
 
----Encode string for export
+-- Base64 character set
+local B64_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
+
+-- Build reverse lookup table
+local B64_DECODE = {}
+for i = 1, #B64_CHARS do
+    B64_DECODE[B64_CHARS:sub(i, i)] = i - 1
+end
+
+---Encode string to base64
 ---@param str string String to encode
 ---@return string Encoded string
 function Utils.EncodeString(str)
-    -- Simple base64-like encoding for profile export
-    -- In production, use proper Base64 library
-    local b64chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
-    local result = ""
+    local result = {}
+    local padding = (3 - #str % 3) % 3
+
+    -- Pad string
+    str = str .. string.rep('\0', padding)
 
     for i = 1, #str, 3 do
         local a, b, c = string.byte(str, i, i + 2)
-        b = b or 0
-        c = c or 0
-
         local n = a * 65536 + b * 256 + c
 
         local c1 = math.floor(n / 262144) % 64 + 1
@@ -145,12 +152,69 @@ function Utils.EncodeString(str)
         local c3 = math.floor(n / 64) % 64 + 1
         local c4 = n % 64 + 1
 
-        result = result .. b64chars:sub(c1, c1) .. b64chars:sub(c2, c2)
-        if b > 0 then result = result .. b64chars:sub(c3, c3) end
-        if c > 0 then result = result .. b64chars:sub(c4, c4) end
+        table.insert(result, B64_CHARS:sub(c1, c1))
+        table.insert(result, B64_CHARS:sub(c2, c2))
+        table.insert(result, B64_CHARS:sub(c3, c3))
+        table.insert(result, B64_CHARS:sub(c4, c4))
     end
 
-    return result
+    -- Replace padding with =
+    local encoded = table.concat(result)
+    if padding > 0 then
+        encoded = encoded:sub(1, -padding - 1) .. string.rep('=', padding)
+    end
+
+    return encoded
+end
+
+---Decode base64 string
+---@param str string Encoded string
+---@return string|nil Decoded string
+function Utils.DecodeString(str)
+    if not str or str == "" then return nil end
+
+    -- Remove whitespace
+    str = str:gsub("%s+", "")
+
+    -- Check for valid base64
+    if not str:match("^[A-Za-z0-9+/=]+$") then
+        return nil
+    end
+
+    -- Count padding
+    local padding = 0
+    if str:sub(-2) == "==" then
+        padding = 2
+    elseif str:sub(-1) == "=" then
+        padding = 1
+    end
+
+    -- Remove padding for processing
+    str = str:gsub("=", "A")
+
+    local result = {}
+
+    for i = 1, #str, 4 do
+        local c1 = B64_DECODE[str:sub(i, i)] or 0
+        local c2 = B64_DECODE[str:sub(i + 1, i + 1)] or 0
+        local c3 = B64_DECODE[str:sub(i + 2, i + 2)] or 0
+        local c4 = B64_DECODE[str:sub(i + 3, i + 3)] or 0
+
+        local n = c1 * 262144 + c2 * 4096 + c3 * 64 + c4
+
+        table.insert(result, string.char(math.floor(n / 65536) % 256))
+        table.insert(result, string.char(math.floor(n / 256) % 256))
+        table.insert(result, string.char(n % 256))
+    end
+
+    local decoded = table.concat(result)
+
+    -- Remove padding bytes
+    if padding > 0 then
+        decoded = decoded:sub(1, -padding - 1)
+    end
+
+    return decoded
 end
 
 ---Print message

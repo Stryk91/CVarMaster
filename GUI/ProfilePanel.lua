@@ -65,7 +65,9 @@ function GUI:ShowProfileWindow()
         local importBtn = GUI:CreateButton(nil, ProfileWindow, "Import", 80, 26)
         importBtn:SetPoint("BOTTOMLEFT", 10, 15)
         importBtn:SetScript("OnClick", function()
-            CVarMaster.Utils.Print("Paste import string in chat: /cvm import <string>")
+            if CVarMaster.ProfileManager and CVarMaster.ProfileManager.ShowImportDialog then
+                CVarMaster.ProfileManager:ShowImportDialog()
+            end
         end)
         
         tinsert(UISpecialFrames, "CVarMasterProfileWindow")
@@ -121,12 +123,33 @@ function GUI:RefreshProfileList()
         local exportBtn = GUI:CreateButton(nil, row, "Export", 50, 22)
         exportBtn:SetPoint("RIGHT", loadBtn, "LEFT", -4, 0)
         exportBtn:SetScript("OnClick", function()
-            local exported = CVarMaster.ProfileManager:ExportProfile(name)
-            if exported then
-                print("|cff00ff00Export string:|r")
-                print(exported)
+            if CVarMaster.WeakAuraExport then
+                CVarMaster.WeakAuraExport:ShowProfileExportDialog(name)
             end
         end)
+        exportBtn:SetScript("OnEnter", function(self)
+            GameTooltip:SetOwner(self, "ANCHOR_TOP")
+            GameTooltip:SetText("Export Profile", 1, 1, 1)
+            GameTooltip:AddLine("Generate WeakAura init script", 0.7, 0.7, 0.7)
+            GameTooltip:Show()
+        end)
+        exportBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
+        -- Share button (encoded string for import)
+        local shareBtn = GUI:CreateButton(nil, row, "Share", 45, 22)
+        shareBtn:SetPoint("RIGHT", exportBtn, "LEFT", -4, 0)
+        shareBtn:SetScript("OnClick", function()
+            if CVarMaster.WeakAuraExport then
+                CVarMaster.WeakAuraExport:ShowEncodedExportDialog(name)
+            end
+        end)
+        shareBtn:SetScript("OnEnter", function(self)
+            GameTooltip:SetOwner(self, "ANCHOR_TOP")
+            GameTooltip:SetText("Share Profile", 1, 1, 1)
+            GameTooltip:AddLine("Generate encoded string for import", 0.7, 0.7, 0.7)
+            GameTooltip:Show()
+        end)
+        shareBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
         
         yOffset = yOffset - 32
     end

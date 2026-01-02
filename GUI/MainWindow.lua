@@ -230,6 +230,23 @@ function GUI:InitMainWindow()
         GUI:RefreshCVarList()
     end)
     MainWindow.modifiedBtn = modifiedBtn
+
+    -- WeakAura Export button
+    local waExportBtn = GUI:CreateButton(nil, bottomBar, "WA Export", 80, C.BUTTON_HEIGHT)
+    waExportBtn:SetPoint("RIGHT", modifiedBtn, "LEFT", -S("SM"), 0)
+    waExportBtn:SetScript("OnClick", function()
+        if CVarMaster.WeakAuraExport then
+            CVarMaster.WeakAuraExport:ShowExportDialog()
+        end
+    end)
+    waExportBtn:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_TOP")
+        GameTooltip:SetText("Export to WeakAura", 1, 1, 1)
+        GameTooltip:AddLine("Generate init script for modified CVars", 0.7, 0.7, 0.7)
+        GameTooltip:AddLine("Paste into WeakAura Init Action", 0.5, 0.5, 0.5)
+        GameTooltip:Show()
+    end)
+    waExportBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
     
     tinsert(UISpecialFrames, "CVarMasterMainWindow")
     isInitialized = true
