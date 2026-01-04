@@ -263,21 +263,26 @@ end
 function GUI:RefreshCVarList(searchTerm)
     local mainWindow = GUI:GetMainWindow()
     if not mainWindow then return end
-    
+
     local content = mainWindow.listContent
     if not content then return end
-    
+
     local ROW_HEIGHT = GetRowHeight()
-    
+
+    -- Get search term from searchbox if not provided (preserves filter after edits)
+    if not searchTerm and mainWindow.searchBox then
+        searchTerm = mainWindow.searchBox:GetText()
+    end
+
     -- Get CVars
     local cvars = CVarMaster.CVarScanner:GetCachedCVars()
-    
+
     -- Filter by category
     local selectedCat = GUI:GetSelectedCategory()
     if selectedCat and selectedCat ~= "All" then
         cvars = CVarMaster.CVarScanner:FilterByCategory(selectedCat, cvars)
     end
-    
+
     -- Filter by search
     if searchTerm and searchTerm ~= "" then
         cvars = CVarMaster.CVarScanner:SearchCVars(searchTerm, cvars)
