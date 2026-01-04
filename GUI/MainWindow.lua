@@ -231,9 +231,25 @@ function GUI:InitMainWindow()
     end)
     MainWindow.modifiedBtn = modifiedBtn
 
+    -- Profiles button
+    local profileBtn = GUI:CreateButton(nil, bottomBar, "Profiles", 80, C.BUTTON_HEIGHT)
+    profileBtn:SetPoint("RIGHT", modifiedBtn, "LEFT", -S("SM"), 0)
+    profileBtn:SetScript("OnClick", function()
+        if GUI.ShowProfileWindow then
+            GUI:ShowProfileWindow()
+        end
+    end)
+    profileBtn:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_TOP")
+        GameTooltip:SetText("Profile Manager", 1, 1, 1)
+        GameTooltip:AddLine("Save, load, and share CVar profiles", 0.7, 0.7, 0.7)
+        GameTooltip:Show()
+    end)
+    profileBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
     -- WeakAura Export button
     local waExportBtn = GUI:CreateButton(nil, bottomBar, "WA Export", 80, C.BUTTON_HEIGHT)
-    waExportBtn:SetPoint("RIGHT", modifiedBtn, "LEFT", -S("SM"), 0)
+    waExportBtn:SetPoint("RIGHT", profileBtn, "LEFT", -S("SM"), 0)
     waExportBtn:SetScript("OnClick", function()
         if CVarMaster.WeakAuraExport then
             CVarMaster.WeakAuraExport:ShowExportDialog()

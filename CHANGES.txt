@@ -1,0 +1,37 @@
+tag 2c30ce8e9a9dc507e27ed1d7c72dd7c069d6f062 v1.0.3
+Author:	Stryk9190 <Stryk91@users.noreply.github.com>
+Date:	Fri Jan 2 18:51:26 2026 +1100
+
+v1.0.3: Database expansion (238 new CVars) + WeakAura export fix
+
+commit 8e13a817187788f491778517214fb790adec2ad9
+Author: Stryk9190 <Stryk91@users.noreply.github.com>
+Date:   Fri Jan 2 18:51:14 2026 +1100
+
+    fix: Update hardcoded version to 1.0.3
+
+commit f659d03ba90ce8f62fb8aa7ec52a7f63ab487990
+Author: Stryk9190 <Stryk91@users.noreply.github.com>
+Date:   Fri Jan 2 18:00:51 2026 +1100
+
+    v1.0.3: Database expansion + WeakAura export fix
+    
+    - Added 238 new CVars to database (now 1131 total):
+      * Soft Targeting system (SoftTargetEnemy, SoftTargetFriend, etc.)
+      * Camera Follow system (CameraFollowPitchSpeed, etc.)
+      * Advanced Flying/Dragonriding CVars
+      * Delves system (11.0 TWW)
+      * Ping system (10.1+)
+      * Preemptive Cast (11.0+)
+      * Empower abilities (Evoker)
+      * Graphics: ASSAO, CMAA2, VRS, clustered shading
+      * Voice chat, professions, trading post, transmog
+    
+    - Fixed WeakAura export dialog not showing text
+      * WoW EditBox SetText() fails on large text
+      * Implemented chunked Insert() workaround
+      * Added proper ScrollFrame for navigation
+    
+    - Added friendly names for new CVars in CVarPrettyNames
+    - Added descriptions for all new CVars
+
