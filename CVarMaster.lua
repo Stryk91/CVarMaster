@@ -226,7 +226,7 @@ local function Initialize()
         CVarMaster.CVarScanner:ScanAll()
     end
     
-    print("|cff00aaffCVarMaster|r v1.0.5 loaded - Type |cff00ff00/cvm|r to open")
+    print("|cff00aaffCVarMaster|r v1.0.6 loaded - Type |cff00ff00/cvm|r to open")
 end
 
 frame:RegisterEvent("PLAYER_LOGIN")
