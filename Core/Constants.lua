@@ -2,7 +2,7 @@
 local ADDON_NAME, CVarMaster = ...
 
 CVarMaster.Constants = {
-    VERSION = "1.0.6",
+    VERSION = "1.0.7",
 
     -- Display modes
     MODES = {

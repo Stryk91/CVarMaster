@@ -69,7 +69,12 @@ function GUI:InitMainWindow()
     version:SetPoint("LEFT", title, "RIGHT", S("SM"), 0)
     version:SetText("v" .. Constants.VERSION)
     version:SetTextColor(T("TEXT_MUTED"))
-    
+
+    -- Subtitle / Call to action
+    local subtitle = titleBar:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    subtitle:SetPoint("LEFT", version, "RIGHT", S("LG"), 0)
+    subtitle:SetText("|cff888888Comment on CurseForge with your idea and I'll make this addon better!|r")
+
     -- Close button
     local closeBtn = GUI:CreateButton(nil, titleBar, "X", 30, 30)
     closeBtn:SetPoint("RIGHT", -S("XS"), 0)
