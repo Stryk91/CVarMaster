@@ -304,7 +304,7 @@ CVarMaster.CVarDescriptions = {
     ["hbaoNormals"] = "Use surface normals for more accurate HBAO shadows (better quality)",
     ["hbaoPowerExp"] = "HBAO shadow intensity curve - affects how dark shadows get",
     ["hbaoRadius"] = "Size of HBAO shadow sampling area - larger = softer, wider shadows",
-    ["hdPlayerModels"] = "Use high-definition player character models (better looking, uses more memory)"
+    ["hdPlayerModels"] = "Use high-definition player character models (better looking, uses more memory)",
     ["heirloomCollectedFilters"] = "Filter heirloom collection: show owned, not owned, or both",
     ["heirloomSourceFilters"] = "Filter heirlooms by source: dungeons, PvP, vendors, etc.",
     ["hideAdventureJournalAlerts"] = "Stop the Adventure Guide button from flashing with notifications",
@@ -353,7 +353,7 @@ CVarMaster.CVarDescriptions = {
     ["lossOfControlFull"] = "Full control loss warning (stun/fear): 0=off, 1=alert only, 2=show duration",
     ["lossOfControlInterrupt"] = "Interrupt warning: 0=off, 1=show alert only, 2=show alert with duration",
     ["lossOfControlRoot"] = "Root/immobilize warning: 0=off, 1=alert only, 2=show duration countdown",
-    ["lossOfControlSilence"] = "Silence warning: 0=off, 1=show alert only, 2=show alert with duration"
+    ["lossOfControlSilence"] = "Silence warning: 0=off, 1=show alert only, 2=show alert with duration",
     ["M2ForceAdditiveParticleSort"] = "Technical: Force particle sorting (can fix visual bugs with spell effects)",
     ["M2UseInstancing"] = "Use GPU instancing for models (better performance with many similar objects)",
     ["M2UseLOD"] = "Use lower-detail models at distance (better performance, slightly less pretty far away)",
@@ -388,7 +388,7 @@ CVarMaster.CVarDescriptions = {
     ["movieSubtitle"] = "Show subtitles/captions during in-game cinematics",
     ["MSAAAlphaTest"] = "Apply anti-aliasing to transparent edges (foliage, hair) - better quality",
     ["MSAAQuality"] = "MSAA anti-aliasing level: higher = smoother edges, more GPU power needed",
-    ["mtParticles"] = "Use multiple CPU cores for spell effects (better performance)"
+    ["mtParticles"] = "Use multiple CPU cores for spell effects (better performance)",
     ["nameplateClassResourceTopInset"] = "How far from top of screen nameplates stay when showing class resources (combo points, etc.)",
     ["namePlateEnemyClickThrough"] = "Click through enemy nameplates (can't click to target, but can see health bars)",
     ["namePlateEnemySize"] = "Size multiplier for enemy nameplates - bigger = easier to see in combat",
@@ -445,7 +445,7 @@ CVarMaster.CVarDescriptions = {
     ["nameplateShowSelf"] = "Show your personal resource bar: 0=hidden, 1=shown",
     ["nameplateTargetBehindMaxDistance"] = "Show target nameplate even when target is behind you (up to this distance)",
     ["nameplateTargetRadialPosition"] = "Show target nameplate at screen edge when target is off-screen",
-    ["NamePlateVerticalScale"] = "Make nameplates taller or shorter (health bar height)"
+    ["NamePlateVerticalScale"] = "Make nameplates taller or shorter (health bar height)",
     ["nearclip"] = "Minimum render distance - objects closer than this disappear (prevents camera clipping)",
     ["noBuffDebuffFilterOnTarget"] = "Show ALL buffs and debuffs on your target (can be overwhelming but complete)",
     ["NonEmitterCombatRange"] = "Distance from combat at which armor particle effects turn off (saves FPS)",
@@ -496,7 +496,7 @@ CVarMaster.CVarDescriptions = {
     ["questLogCollapseFilter"] = "Remembers which quest categories are collapsed - internal use",
     ["questLogCollapseHeaderFilter"] = "Remembers which quest headers are collapsed - internal use",
     ["questLogOpen"] = "Show quest details panel next to the map",
-    ["questPOI"] = "Show quest objective markers (!) on the world map and minimap"
+    ["questPOI"] = "Show quest objective markers (!) on the world map and minimap",
     ["RAIDcomponentTextureLevel"] = "Raid graphics: Character texture quality (lower = better FPS in raids)",
     ["RAIDDepthBasedOpacity"] = "Raid graphics: Depth-based UI fade effects",
     ["RAIDenvironmentDetail"] = "Raid graphics: Ground clutter like grass and debris",
@@ -563,7 +563,7 @@ CVarMaster.CVarDescriptions = {
     ["RAIDWaterDetail"] = "Raid graphics: Water/liquid rendering quality",
     ["RAIDweatherDensity"] = "Raid graphics: Rain/snow particle density",
     ["RAIDwmoLodDist"] = "Raid graphics: Building/structure detail distance",
-    ["RAIDworldBaseMip"] = "Raid graphics: Base texture detail level for the world"
+    ["RAIDworldBaseMip"] = "Raid graphics: Base texture detail level for the world",
     ["rawMouseAccelerationEnable"] = "Apply mouse acceleration to raw input (not recommended for gaming)",
     ["rawMouseEnable"] = "Bypass Windows mouse settings for more direct control (recommended for precision)",
     ["rawMouseRate"] = "How often raw mouse updates are read (higher = more responsive, uses more CPU)",
@@ -606,7 +606,7 @@ CVarMaster.CVarDescriptions = {
     ["shadowMode"] = "Shadow quality mode: 0=off, 1=blob, 2=low, 3=medium, 4=high, 5=ultra",
     ["shadowScissor"] = "Optimize shadow rendering by clipping (performance optimization)",
     ["shadowSoft"] = "Make shadow edges soft instead of hard (more realistic, uses more GPU)",
-    ["shadowTextureSize"] = "Shadow map resolution - higher = sharper shadows, uses more VRAM"
+    ["shadowTextureSize"] = "Shadow map resolution - higher = sharper shadows, uses more VRAM",
     ["shipyardMissionTutorialAreaBuff"] = "Tracks Shipyard area buff mission tutorial - internal use",
     ["shipyardMissionTutorialBlockade"] = "Tracks Shipyard blockade mission tutorial - internal use",
     ["shipyardMissionTutorialFirst"] = "Tracks first Shipyard mission tutorial - internal use",
@@ -663,7 +663,7 @@ CVarMaster.CVarDescriptions = {
     ["smoothUnitPhasingDistThreshold"] = "Distance at which smooth phasing activates (yards)",
     ["smoothUnitPhasingEnableAlive"] = "Try to reuse existing NPC models during phase changes (smoother)",
     ["smoothUnitPhasingUnseenPurgatoryTimeMs"] = "How long unseen units stay in memory during phasing",
-    ["smoothUnitPhasingVehicleExtraTimeoutMs"] = "Extra time for vehicles to phase so passengers can too"
+    ["smoothUnitPhasingVehicleExtraTimeoutMs"] = "Extra time for vehicles to phase so passengers can too",
     ["Sound_AmbienceVolume"] = "Volume of environmental background sounds (wind, water, nature)",
     ["Sound_DialogVolume"] = "Volume of NPC voice acting and quest dialogue",
     ["Sound_DSPBufferSize"] = "Audio buffer size (higher = more latency, lower = may crackle)",
@@ -744,7 +744,7 @@ CVarMaster.CVarDescriptions = {
     ["synchronizeSettings"] = "Master switch for syncing settings to Blizzard's servers",
     ["taintLog"] = "Log addon security issues to file (for addon developers)",
     ["talentFrameShown"] = "Tracks if you've seen the talent frame - internal use",
-    ["talentPointsSpent"] = "Tracks if you've spent a talent point - internal use"
+    ["talentPointsSpent"] = "Tracks if you've spent a talent point - internal use",
     ["TargetNearestUseNew"] = "Use the improved Tab-targeting system (added in 7.2)",
     ["targetOfTargetMode"] = "When to show target-of-target: 0=never, 1=always, 2=not in party, 3=hostile only",
     ["TargetPriorityAllowAnyOnScreen"] = "Tab-target: Allow selecting any visible target if ideal not found (2=even out of range)",
@@ -820,7 +820,7 @@ CVarMaster.CVarDescriptions = {
     ["unitClutter"] = "Reduce visual clutter from many players (hides some overlapping names/effects)",
     ["unitClutterInstancesOnly"] = "Only use unit clutter in dungeons/raids (not in open world)",
     ["unitClutterPlayerThreshold"] = "How many players nearby before clutter reduction kicks in",
-    ["unitHighlights"] = "Show highlight circle under targeted/moused-over units"
+    ["unitHighlights"] = "Show highlight circle under targeted/moused-over units",
     ["UnitNameEnemyGuardianName"] = "Show names above enemy guardian pets (Shadowfiend, Army of Dead)",
     ["UnitNameEnemyMinionName"] = "Show names above enemy summoned creatures (imps, water elementals)",
     ["UnitNameEnemyPetName"] = "Show names above enemy hunter/warlock pets",
@@ -893,7 +893,7 @@ CVarMaster.CVarDescriptions = {
     ["WorldTextScale"] = "Size of floating combat/XP numbers (higher = bigger)",
     ["WorldTextScreenY"] = "Vertical position where combat numbers appear",
     ["WorldTextStartPosRandomness"] = "How randomly combat numbers are positioned",
-    ["xpBarText"] = "Show numeric XP progress on the experience bar"
+    ["xpBarText"] = "Show numeric XP progress on the experience bar",
     -- SOFT TARGET SYSTEM (10.0+) - Controller/action targeting
     ["SoftTargetEnemy"] = "Auto-target enemies when facing them: 0=off, 1=basic, 2=with abilities, 3=full",
     ["SoftTargetFriend"] = "Auto-target friendlies when facing them: 0=off, 1=basic, 2=with abilities, 3=full",
