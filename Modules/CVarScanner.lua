@@ -189,36 +189,64 @@ function Scanner:FilterModified(sourceTable)
     return results
 end
 
----Search CVars by name/description
+---Helper: Check if all words are found in the searchable text
+local function matchesAllWords(words, searchText)
+    for _, word in ipairs(words) do
+        if not searchText:find(word, 1, true) then
+            return false
+        end
+    end
+    return true
+end
+
+---Search CVars by name/description (multi-word AND search)
 function Scanner:Search(query)
     local results = {}
     local lowerQuery = query:lower()
-    
-    for name, data in pairs(self:GetCachedCVars()) do
-        local match = false
-        if name:lower():find(lowerQuery, 1, true) then match = true end
-        if data.friendlyName and data.friendlyName:lower():find(lowerQuery, 1, true) then match = true end
-        if data.description and data.description:lower():find(lowerQuery, 1, true) then match = true end
-        if match then results[name] = data end
+
+    -- Split query into words (space-separated)
+    local words = {}
+    for word in lowerQuery:gmatch("%S+") do
+        table.insert(words, word)
     end
-    
+
+    for name, data in pairs(self:GetCachedCVars()) do
+        -- Build combined searchable text
+        local searchText = name:lower()
+        if data.friendlyName then searchText = searchText .. " " .. data.friendlyName:lower() end
+        if data.description then searchText = searchText .. " " .. data.description:lower() end
+
+        if matchesAllWords(words, searchText) then
+            results[name] = data
+        end
+    end
+
     return results
 end
 
----Alias for Search
+---Alias for Search (multi-word AND search)
 function Scanner:SearchCVars(query, sourceTable)
     local lowerQuery = query:lower()
     local source = sourceTable or self:GetCachedCVars()
     local results = {}
-    
-    for name, data in pairs(source) do
-        local match = false
-        if name:lower():find(lowerQuery, 1, true) then match = true end
-        if data.friendlyName and data.friendlyName:lower():find(lowerQuery, 1, true) then match = true end
-        if data.description and data.description:lower():find(lowerQuery, 1, true) then match = true end
-        if match then results[name] = data end
+
+    -- Split query into words (space-separated)
+    local words = {}
+    for word in lowerQuery:gmatch("%S+") do
+        table.insert(words, word)
     end
-    
+
+    for name, data in pairs(source) do
+        -- Build combined searchable text
+        local searchText = name:lower()
+        if data.friendlyName then searchText = searchText .. " " .. data.friendlyName:lower() end
+        if data.description then searchText = searchText .. " " .. data.description:lower() end
+
+        if matchesAllWords(words, searchText) then
+            results[name] = data
+        end
+    end
+
     return results
 end
 
