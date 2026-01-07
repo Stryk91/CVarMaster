@@ -173,7 +173,7 @@ local function CreateRow(parent, index)
             end
             
             GameTooltip:AddLine(" ")
-            GameTooltip:AddLine("|cff888888Left-click to edit, Right-click for options|r")
+            GameTooltip:AddLine("|cff888888Left-click to edit  |  Right-click for description|r")
             GameTooltip:Show()
         end
     end)
@@ -330,38 +330,169 @@ function GUI:RefreshCVarList(searchTerm)
     GUI:UpdateCategoryCounts(categoryCounts)
 end
 
----Show context menu for a CVar
+-- Description popup frame (created once, reused)
+local descriptionPopup = nil
+
+local function CreateDescriptionPopup()
+    if descriptionPopup then return descriptionPopup end
+
+    local popup = CreateFrame("Frame", "CVarMasterDescPopup", UIParent, "BackdropTemplate")
+    popup:SetSize(400, 200)
+    popup:SetFrameStrata("DIALOG")
+    popup:SetFrameLevel(100)
+    popup:SetClampedToScreen(true)
+    popup:EnableMouse(true)
+    popup:SetMovable(true)
+    popup:RegisterForDrag("LeftButton")
+    popup:SetScript("OnDragStart", popup.StartMoving)
+    popup:SetScript("OnDragStop", popup.StopMovingOrSizing)
+
+    -- Dark theme background
+    popup:SetBackdrop({
+        bgFile = "Interface\\Buttons\\WHITE8x8",
+        edgeFile = "Interface\\Buttons\\WHITE8x8",
+        edgeSize = 2,
+    })
+    popup:SetBackdropColor(0.08, 0.09, 0.08, 0.98)
+    popup:SetBackdropBorderColor(0.35, 0.55, 0.38, 0.8)
+
+    -- Title bar
+    popup.titleBar = CreateFrame("Frame", nil, popup, "BackdropTemplate")
+    popup.titleBar:SetHeight(28)
+    popup.titleBar:SetPoint("TOPLEFT", 2, -2)
+    popup.titleBar:SetPoint("TOPRIGHT", -2, -2)
+    popup.titleBar:SetBackdrop({ bgFile = "Interface\\Buttons\\WHITE8x8" })
+    popup.titleBar:SetBackdropColor(0.12, 0.16, 0.12, 1)
+
+    -- Title text (friendly name)
+    popup.title = popup.titleBar:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    popup.title:SetPoint("LEFT", 10, 0)
+    popup.title:SetTextColor(0.55, 0.85, 0.58, 1)
+
+    -- Close button
+    popup.closeBtn = CreateFrame("Button", nil, popup.titleBar)
+    popup.closeBtn:SetSize(20, 20)
+    popup.closeBtn:SetPoint("RIGHT", -4, 0)
+    popup.closeBtn:SetNormalFontObject("GameFontNormal")
+    popup.closeBtn.text = popup.closeBtn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    popup.closeBtn.text:SetPoint("CENTER")
+    popup.closeBtn.text:SetText("X")
+    popup.closeBtn.text:SetTextColor(0.8, 0.8, 0.8)
+    popup.closeBtn:SetScript("OnClick", function() popup:Hide() end)
+    popup.closeBtn:SetScript("OnEnter", function(self) self.text:SetTextColor(1, 0.3, 0.3) end)
+    popup.closeBtn:SetScript("OnLeave", function(self) self.text:SetTextColor(0.8, 0.8, 0.8) end)
+
+    -- Technical name
+    popup.techName = popup:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    popup.techName:SetPoint("TOPLEFT", popup.titleBar, "BOTTOMLEFT", 10, -8)
+    popup.techName:SetTextColor(0.5, 0.5, 0.5)
+
+    -- Separator line
+    popup.sep = popup:CreateTexture(nil, "ARTWORK")
+    popup.sep:SetHeight(1)
+    popup.sep:SetPoint("TOPLEFT", popup.techName, "BOTTOMLEFT", -5, -8)
+    popup.sep:SetPoint("TOPRIGHT", popup, "TOPRIGHT", -10, 0)
+    popup.sep:SetColorTexture(0.3, 0.4, 0.32, 0.5)
+
+    -- Description text (scrollable)
+    popup.scrollFrame = CreateFrame("ScrollFrame", nil, popup, "UIPanelScrollFrameTemplate")
+    popup.scrollFrame:SetPoint("TOPLEFT", popup.sep, "BOTTOMLEFT", 0, -8)
+    popup.scrollFrame:SetPoint("BOTTOMRIGHT", popup, "BOTTOMRIGHT", -28, 50)
+
+    popup.descText = CreateFrame("Frame", nil, popup.scrollFrame)
+    popup.descText:SetSize(350, 100)
+    popup.scrollFrame:SetScrollChild(popup.descText)
+
+    popup.descLabel = popup.descText:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    popup.descLabel:SetPoint("TOPLEFT", 5, -5)
+    popup.descLabel:SetWidth(340)
+    popup.descLabel:SetJustifyH("LEFT")
+    popup.descLabel:SetJustifyV("TOP")
+    popup.descLabel:SetSpacing(3)
+
+    -- Info section at bottom
+    popup.infoFrame = CreateFrame("Frame", nil, popup, "BackdropTemplate")
+    popup.infoFrame:SetHeight(40)
+    popup.infoFrame:SetPoint("BOTTOMLEFT", 2, 2)
+    popup.infoFrame:SetPoint("BOTTOMRIGHT", -2, 2)
+    popup.infoFrame:SetBackdrop({ bgFile = "Interface\\Buttons\\WHITE8x8" })
+    popup.infoFrame:SetBackdropColor(0.06, 0.07, 0.06, 1)
+
+    popup.currentLabel = popup.infoFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    popup.currentLabel:SetPoint("LEFT", 10, 6)
+    popup.currentLabel:SetTextColor(0.6, 0.6, 0.6)
+
+    popup.currentValue = popup.infoFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    popup.currentValue:SetPoint("LEFT", popup.currentLabel, "RIGHT", 5, 0)
+
+    popup.defaultLabel = popup.infoFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    popup.defaultLabel:SetPoint("LEFT", 10, -8)
+    popup.defaultLabel:SetTextColor(0.6, 0.6, 0.6)
+
+    popup.defaultValue = popup.infoFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    popup.defaultValue:SetPoint("LEFT", popup.defaultLabel, "RIGHT", 5, 0)
+    popup.defaultValue:SetTextColor(0.5, 0.5, 0.5)
+
+    popup.typeLabel = popup.infoFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    popup.typeLabel:SetPoint("RIGHT", -10, 0)
+    popup.typeLabel:SetTextColor(0.5, 0.5, 0.5)
+
+    -- Hide on escape
+    popup:SetScript("OnKeyDown", function(self, key)
+        if key == "ESCAPE" then
+            self:Hide()
+            self:SetPropagateKeyboardInput(false)
+        else
+            self:SetPropagateKeyboardInput(true)
+        end
+    end)
+
+    popup:Hide()
+    descriptionPopup = popup
+    return popup
+end
+
+---Show description popup for a CVar
 ---@param anchor Frame Anchor frame
 ---@param cvarData table CVar data
 function GUI:ShowCVarContextMenu(anchor, cvarData)
-    local menu = {
-        { text = cvarData.friendlyName, isTitle = true },
-        { text = "Copy Name", func = function()
-            print("CVar: " .. cvarData.name)
-        end },
-        { text = "Copy Value", func = function()
-            print("Value: " .. cvarData.value)
-        end },
-    }
-    
+    local popup = CreateDescriptionPopup()
+
+    -- Set content
+    popup.title:SetText(cvarData.friendlyName or cvarData.name)
+    popup.techName:SetText("CVar: " .. cvarData.name)
+
+    -- Description
+    local desc = cvarData.description
+    if not desc or desc == "" then
+        desc = "No description available for this CVar."
+    end
+    popup.descLabel:SetText(desc)
+
+    -- Adjust scroll content height based on text
+    local textHeight = popup.descLabel:GetStringHeight() + 20
+    popup.descText:SetHeight(math.max(50, textHeight))
+
+    -- Current/Default values
+    popup.currentLabel:SetText("Current:")
+    popup.currentValue:SetText(cvarData.value)
     if cvarData.isModified then
-        table.insert(menu, { text = "Reset to Default", func = function()
-            CVarMaster.CVarManager:ResetCVar(cvarData.name)
-            CVarMaster.CVarScanner:UpdateCVarInCache(cvarData.name)
-            GUI:RefreshCVarList()
-        end })
+        popup.currentValue:SetTextColor(1, 0.9, 0.3) -- Yellow for modified
+    else
+        popup.currentValue:SetTextColor(0.3, 1, 0.3) -- Green for default
     end
-    
-    if cvarData.dataType == "boolean" then
-        local newVal = (cvarData.value == "1" or cvarData.value == "true") and "0" or "1"
-        table.insert(menu, { text = "Toggle Value", func = function()
-            CVarMaster.CVarManager:SetCVar(cvarData.name, newVal)
-            CVarMaster.CVarScanner:UpdateCVarInCache(cvarData.name)
-            GUI:RefreshCVarList()
-        end })
-    end
-    
-    if EasyMenu then
-        EasyMenu(menu, CreateFrame("Frame", nil, anchor, "UIDropDownMenuTemplate"), anchor, 0, 0, "MENU")
-    end
+
+    popup.defaultLabel:SetText("Default:")
+    popup.defaultValue:SetText(cvarData.defaultValue or "?")
+
+    -- Type
+    popup.typeLabel:SetText("Type: " .. (cvarData.dataType or "unknown"))
+
+    -- Position near anchor
+    popup:ClearAllPoints()
+    popup:SetPoint("TOPLEFT", anchor, "TOPRIGHT", 10, 0)
+
+    -- Show
+    popup:Show()
+    popup:Raise()
 end
