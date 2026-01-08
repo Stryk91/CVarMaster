@@ -8,8 +8,11 @@ local Constants = CVarMaster.Constants
 local rowPool = {}
 local activeRows = {}
 
--- Local theme helpers
+-- Local theme helpers (with ThemeManager support)
 local function T(key)
+    if CVarMaster.ThemeManager and CVarMaster.ThemeManager.GetThemeColor then
+        return CVarMaster.ThemeManager:GetThemeColor(key)
+    end
     if Constants and Constants.THEME and Constants.THEME[key] then
         return unpack(Constants.THEME[key])
     end

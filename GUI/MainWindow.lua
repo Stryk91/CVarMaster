@@ -8,8 +8,11 @@ local MainWindow = nil
 local isInitialized = false
 local currentScale = 1.0
 
--- Local theme helper
+-- Local theme helper (with ThemeManager support)
 local function T(key)
+    if CVarMaster.ThemeManager and CVarMaster.ThemeManager.GetThemeColor then
+        return CVarMaster.ThemeManager:GetThemeColor(key)
+    end
     if Constants and Constants.THEME and Constants.THEME[key] then
         return unpack(Constants.THEME[key])
     end
@@ -268,7 +271,32 @@ function GUI:InitMainWindow()
         GameTooltip:Show()
     end)
     waExportBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
-    
+
+    -- Theme button
+    local themeBtn = GUI:CreateButton(nil, bottomBar, "Theme", 65, C.BUTTON_HEIGHT)
+    themeBtn:SetPoint("RIGHT", waExportBtn, "LEFT", -S("SM"), 0)
+    themeBtn:SetBackdropBorderColor(0.45, 0.30, 0.60, 0.8)
+    themeBtn:SetScript("OnClick", function()
+        if GUI.ShowThemeWindow then
+            GUI:ShowThemeWindow()
+        end
+    end)
+    themeBtn:SetScript("OnEnter", function(self)
+        self:SetBackdropColor(0.25, 0.18, 0.35, 1)
+        self:SetBackdropBorderColor(0.60, 0.40, 0.80, 1)
+        self.text:SetTextColor(0.80, 0.60, 1.0)
+        GameTooltip:SetOwner(self, "ANCHOR_TOP")
+        GameTooltip:SetText("Theme Customization", 0.80, 0.60, 1.0)
+        GameTooltip:AddLine("Change colors and fonts", 0.7, 0.7, 0.7)
+        GameTooltip:Show()
+    end)
+    themeBtn:SetScript("OnLeave", function(self)
+        self:SetBackdropColor(T("BTN_NORMAL"))
+        self:SetBackdropBorderColor(0.45, 0.30, 0.60, 0.8)
+        self.text:SetTextColor(T("TEXT_PRIMARY"))
+        GameTooltip:Hide()
+    end)
+
     tinsert(UISpecialFrames, "CVarMasterMainWindow")
     isInitialized = true
 end

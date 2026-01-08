@@ -2,7 +2,7 @@
 ## Title: |cff00aaffCVar|r|cffffffffMaster|r
 ## Notes: The definitive CVar management and configuration tool
 ## Author: Stryker
-## Version: 1.0.11
+## Version: 1.1.0
 ## SavedVariables: CVarMasterDB
 ## SavedVariablesPerCharacter: CVarMasterCharDB
 ## X-Curse-Project-ID: 1410205
@@ -26,6 +26,7 @@ Modules\CVarManager.lua
 Modules\ProfileManager.lua
 Modules\SafetyManager.lua
 Modules\WeakAuraExport.lua
+Modules\ThemeManager.lua
 
 # GUI Components
 GUI\Framework.lua
@@ -35,6 +36,7 @@ GUI\CVarEditor.lua
 GUI\SearchPanel.lua
 GUI\ProfilePanel.lua
 GUI\ComparisonView.lua
+GUI\ThemePanel.lua
 
 # Main
 CVarMaster.lua

@@ -4,12 +4,14 @@ local ADDON_NAME, CVarMaster = ...
 CVarMaster.GUI = CVarMaster.GUI or {}
 local GUI = CVarMaster.GUI
 
--- Get theme colors (with fallback)
+-- Get theme colors (with ThemeManager support)
 local function T(key)
+    if CVarMaster.ThemeManager and CVarMaster.ThemeManager.GetThemeColor then
+        return CVarMaster.ThemeManager:GetThemeColor(key)
+    end
     if CVarMaster.Constants and CVarMaster.Constants.THEME and CVarMaster.Constants.THEME[key] then
         return unpack(CVarMaster.Constants.THEME[key])
     end
-    -- Fallback to grey if theme not loaded
     return 0.5, 0.5, 0.5, 1.0
 end
 

@@ -5,8 +5,11 @@ local GUI = CVarMaster.GUI
 
 local ProfileWindow = nil
 
--- Local theme helper
+-- Local theme helper (with ThemeManager support)
 local function T(key)
+    if CVarMaster.ThemeManager and CVarMaster.ThemeManager.GetThemeColor then
+        return CVarMaster.ThemeManager:GetThemeColor(key)
+    end
     if CVarMaster.Constants and CVarMaster.Constants.THEME and CVarMaster.Constants.THEME[key] then
         return unpack(CVarMaster.Constants.THEME[key])
     end
