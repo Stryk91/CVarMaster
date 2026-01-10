@@ -235,3 +235,122 @@ end
 function Manager:IsInCombat()
     return IsInCombat()
 end
+
+-- ============================================================================
+-- LOCK/PERSIST SYSTEM
+-- Locked CVars are automatically reapplied on PLAYER_LOGIN
+-- ============================================================================
+
+---Lock a CVar to persist across sessions
+---@param cvarName string CVar name
+---@param value string|nil Value to lock (uses current value if nil)
+function Manager:LockCVar(cvarName, value)
+    local data = CVarMaster.CVarScanner:GetCVarData(cvarName)
+    if not data then
+        print("|cffff0000CVarMaster:|r CVar not found:", cvarName)
+        return false
+    end
+
+    -- Ensure charDB exists
+    if not CVarMaster.charDB then
+        CVarMaster.charDB = {}
+    end
+    if not CVarMaster.charDB.lockedCVars then
+        CVarMaster.charDB.lockedCVars = {}
+    end
+
+    -- Use current value if not specified
+    local lockValue = value or data.value
+    CVarMaster.charDB.lockedCVars[cvarName] = lockValue
+
+    print("|cff00aaffCVarMaster:|r Locked |cffffaa00" .. (data.friendlyName or cvarName) .. "|r = " .. lockValue)
+    return true
+end
+
+---Unlock a CVar (stop persisting)
+---@param cvarName string CVar name
+function Manager:UnlockCVar(cvarName)
+    if not CVarMaster.charDB or not CVarMaster.charDB.lockedCVars then
+        print("|cffff0000CVarMaster:|r No locked CVars")
+        return false
+    end
+
+    if not CVarMaster.charDB.lockedCVars[cvarName] then
+        print("|cffff0000CVarMaster:|r CVar not locked:", cvarName)
+        return false
+    end
+
+    local data = CVarMaster.CVarScanner:GetCVarData(cvarName)
+    local friendlyName = data and data.friendlyName or cvarName
+
+    CVarMaster.charDB.lockedCVars[cvarName] = nil
+    print("|cff00aaffCVarMaster:|r Unlocked |cffffaa00" .. friendlyName .. "|r")
+    return true
+end
+
+---Check if a CVar is locked
+---@param cvarName string CVar name
+---@return boolean isLocked
+---@return string|nil lockedValue
+function Manager:IsLocked(cvarName)
+    if not CVarMaster.charDB or not CVarMaster.charDB.lockedCVars then
+        return false, nil
+    end
+    local value = CVarMaster.charDB.lockedCVars[cvarName]
+    return value ~= nil, value
+end
+
+---Get all locked CVars
+---@return table lockedCVars Table of {cvarName = value}
+function Manager:GetLockedCVars()
+    if not CVarMaster.charDB or not CVarMaster.charDB.lockedCVars then
+        return {}
+    end
+    return CVarMaster.charDB.lockedCVars
+end
+
+---Apply all locked CVars (called on PLAYER_LOGIN)
+---@return number count Number of CVars applied
+function Manager:ApplyLockedCVars()
+    local locked = self:GetLockedCVars()
+    local count = 0
+    local failed = 0
+
+    for cvarName, value in pairs(locked) do
+        local currentValue = GetCVar(cvarName)
+        if currentValue ~= nil then
+            if currentValue ~= value then
+                SetCVar(cvarName, value)
+                count = count + 1
+            end
+        else
+            -- CVar no longer exists, remove from locks
+            CVarMaster.charDB.lockedCVars[cvarName] = nil
+            failed = failed + 1
+        end
+    end
+
+    if count > 0 or failed > 0 then
+        local msg = "|cff00aaffCVarMaster:|r Applied " .. count .. " locked CVar(s)"
+        if failed > 0 then
+            msg = msg .. " |cff888888(" .. failed .. " removed - no longer exist)|r"
+        end
+        print(msg)
+    end
+
+    return count
+end
+
+---Toggle lock state for a CVar
+---@param cvarName string CVar name
+---@return boolean newLockState
+function Manager:ToggleLock(cvarName)
+    local isLocked = self:IsLocked(cvarName)
+    if isLocked then
+        self:UnlockCVar(cvarName)
+        return false
+    else
+        self:LockCVar(cvarName)
+        return true
+    end
+end
