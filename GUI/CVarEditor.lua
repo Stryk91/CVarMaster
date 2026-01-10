@@ -135,6 +135,12 @@ local function CreateRow(parent, index)
         end
     end)
     
+    -- Lock icon for persistent CVars
+    row.lockIcon = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    row.lockIcon:SetPoint("RIGHT", -S("SM") - 20, 0)
+    row.lockIcon:SetText("|cff88aaff@|r")  -- @ as lock symbol
+    row.lockIcon:Hide()
+
     -- Warning icon for dangerous CVars
     row.warningIcon = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     row.warningIcon:SetPoint("RIGHT", -S("SM"), 0)
@@ -165,6 +171,13 @@ local function CreateRow(parent, index)
             GameTooltip:AddDoubleLine("Default:", self.cvarData.defaultValue, 0.7, 0.7, 0.7, 0.6, 0.6, 0.6)
             GameTooltip:AddDoubleLine("Type:", self.cvarData.dataType, 0.7, 0.7, 0.7, 0.6, 0.6, 0.6)
             
+            -- Lock status
+            local isLocked = CVarMaster.CVarManager and CVarMaster.CVarManager:IsLocked(self.cvarData.name)
+            if isLocked then
+                GameTooltip:AddLine(" ")
+                GameTooltip:AddLine("|cff88aaff@ LOCKED|r - persists across sessions")
+            end
+
             -- Warnings
             if self.cvarData.requiresReload then
                 GameTooltip:AddLine(" ")
@@ -174,9 +187,9 @@ local function CreateRow(parent, index)
                 GameTooltip:AddLine(" ")
                 GameTooltip:AddLine("|cffff6644" .. (self.cvarData.dangerWarning or "Use with caution!") .. "|r")
             end
-            
+
             GameTooltip:AddLine(" ")
-            GameTooltip:AddLine("|cff888888Left-click to edit  |  Right-click for description|r")
+            GameTooltip:AddLine("|cff888888Left-click to edit  |  Right-click for options|r")
             GameTooltip:Show()
         end
     end)
@@ -252,6 +265,14 @@ local function PopulateRow(row, cvarData, index)
         end
     else
         row.warningIcon:Hide()
+    end
+
+    -- Lock icon for persistent CVars
+    local isLocked = CVarMaster.CVarManager and CVarMaster.CVarManager:IsLocked(cvarData.name)
+    if isLocked then
+        row.lockIcon:Show()
+    else
+        row.lockIcon:Hide()
     end
     
     -- Reset edit state
@@ -440,6 +461,52 @@ local function CreateDescriptionPopup()
     popup.typeLabel:SetPoint("RIGHT", -10, 0)
     popup.typeLabel:SetTextColor(0.5, 0.5, 0.5)
 
+    -- Lock button
+    popup.lockBtn = CreateFrame("Button", nil, popup.infoFrame, "BackdropTemplate")
+    popup.lockBtn:SetSize(70, 22)
+    popup.lockBtn:SetPoint("RIGHT", popup.typeLabel, "LEFT", -15, 0)
+    popup.lockBtn:SetBackdrop({
+        bgFile = "Interface\\Buttons\\WHITE8x8",
+        edgeFile = "Interface\\Buttons\\WHITE8x8",
+        edgeSize = 1,
+    })
+    popup.lockBtn:SetBackdropColor(0.2, 0.3, 0.4, 1)
+    popup.lockBtn:SetBackdropBorderColor(0.4, 0.5, 0.6, 1)
+
+    popup.lockBtn.text = popup.lockBtn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    popup.lockBtn.text:SetPoint("CENTER")
+    popup.lockBtn.text:SetText("Lock")
+
+    popup.lockBtn:SetScript("OnEnter", function(self)
+        self:SetBackdropColor(0.3, 0.4, 0.5, 1)
+    end)
+    popup.lockBtn:SetScript("OnLeave", function(self)
+        local isLocked = popup.cvarData and CVarMaster.CVarManager and CVarMaster.CVarManager:IsLocked(popup.cvarData.name)
+        if isLocked then
+            self:SetBackdropColor(0.3, 0.5, 0.3, 1)
+        else
+            self:SetBackdropColor(0.2, 0.3, 0.4, 1)
+        end
+    end)
+    popup.lockBtn:SetScript("OnClick", function()
+        if popup.cvarData and CVarMaster.CVarManager then
+            CVarMaster.CVarManager:ToggleLock(popup.cvarData.name)
+            -- Update button state
+            local isLocked = CVarMaster.CVarManager:IsLocked(popup.cvarData.name)
+            if isLocked then
+                popup.lockBtn.text:SetText("Unlock")
+                popup.lockBtn:SetBackdropColor(0.3, 0.5, 0.3, 1)
+            else
+                popup.lockBtn.text:SetText("Lock")
+                popup.lockBtn:SetBackdropColor(0.2, 0.3, 0.4, 1)
+            end
+            -- Refresh main list to update lock icons
+            if GUI.RefreshCVarList then
+                GUI:RefreshCVarList()
+            end
+        end
+    end)
+
     -- Hide on escape
     popup:SetScript("OnKeyDown", function(self, key)
         if key == "ESCAPE" then
@@ -460,6 +527,9 @@ end
 ---@param cvarData table CVar data
 function GUI:ShowCVarContextMenu(anchor, cvarData)
     local popup = CreateDescriptionPopup()
+
+    -- Store cvarData for lock button
+    popup.cvarData = cvarData
 
     -- Set content
     popup.title:SetText(cvarData.friendlyName or cvarData.name)
@@ -490,6 +560,16 @@ function GUI:ShowCVarContextMenu(anchor, cvarData)
 
     -- Type
     popup.typeLabel:SetText("Type: " .. (cvarData.dataType or "unknown"))
+
+    -- Update lock button state
+    local isLocked = CVarMaster.CVarManager and CVarMaster.CVarManager:IsLocked(cvarData.name)
+    if isLocked then
+        popup.lockBtn.text:SetText("Unlock")
+        popup.lockBtn:SetBackdropColor(0.3, 0.5, 0.3, 1)
+    else
+        popup.lockBtn.text:SetText("Lock")
+        popup.lockBtn:SetBackdropColor(0.2, 0.3, 0.4, 1)
+    end
 
     -- Position near anchor
     popup:ClearAllPoints()

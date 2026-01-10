@@ -193,6 +193,40 @@ SlashCmdList["CVARMASTER"] = function(msg)
             print("  /cvm profile export <name> - Export to string")
             print("  /cvm profile import - Import from string")
         end
+    elseif cmd == "lock" then
+        local cvarName = args[2]
+        if not cvarName or cvarName == "" then
+            print("|cffff0000CVarMaster:|r Usage: /cvm lock <cvarName>")
+        elseif CVarMaster.CVarManager then
+            CVarMaster.CVarManager:LockCVar(cvarName)
+        end
+
+    elseif cmd == "unlock" then
+        local cvarName = args[2]
+        if not cvarName or cvarName == "" then
+            print("|cffff0000CVarMaster:|r Usage: /cvm unlock <cvarName>")
+        elseif CVarMaster.CVarManager then
+            CVarMaster.CVarManager:UnlockCVar(cvarName)
+        end
+
+    elseif cmd == "locked" or cmd == "locks" then
+        if CVarMaster.CVarManager then
+            local locked = CVarMaster.CVarManager:GetLockedCVars()
+            local count = 0
+            print("|cff00aaffCVarMaster:|r Locked CVars (persist across sessions):")
+            for name, value in pairs(locked) do
+                local data = CVarMaster.CVarScanner and CVarMaster.CVarScanner:GetCVarData(name)
+                local friendlyName = data and data.friendlyName or name
+                print("  |cff88ff88" .. friendlyName .. "|r (" .. name .. ") = |cffffff00" .. value .. "|r")
+                count = count + 1
+            end
+            if count == 0 then
+                print("  |cff888888No locked CVars|r")
+            else
+                print("  |cff888888Total: " .. count .. " locked|r")
+            end
+        end
+
     elseif cmd == "help" then
         print("|cff00aaffCVarMaster|r Commands:")
         print("  /cvm - Open GUI")
@@ -201,6 +235,9 @@ SlashCmdList["CVARMASTER"] = function(msg)
         print("  /cvm set <name> <value> - Change CVar (safety-checked)")
         print("  /cvm reset <name|all> - Reset to default")
         print("  /cvm modified - List changed CVars")
+        print("  /cvm lock <name> - Lock CVar (persists across sessions)")
+        print("  /cvm unlock <name> - Unlock CVar")
+        print("  /cvm locked - List all locked CVars")
         print("  /cvm backup - Save current state")
         print("  /cvm restore - Restore from backup")
         print("  /cvm scan - Rescan all CVars")
@@ -220,13 +257,19 @@ local function Initialize()
     CVarMaster.db.global = CVarMaster.db.global or { debug = false }
     CVarMaster.charDB = CVarMasterCharDB or {}
     CVarMaster.charDB.mode = CVarMaster.charDB.mode or "basic"
-    
+    CVarMaster.charDB.lockedCVars = CVarMaster.charDB.lockedCVars or {}
+
     -- Scan CVars silently
     if CVarMaster.CVarScanner then
         CVarMaster.CVarScanner:ScanAll()
     end
-    
-    print("|cff00aaffCVarMaster|r v1.0.6 loaded - Type |cff00ff00/cvm|r to open")
+
+    -- Apply locked CVars
+    if CVarMaster.CVarManager then
+        CVarMaster.CVarManager:ApplyLockedCVars()
+    end
+
+    print("|cff00aaffCVarMaster|r v1.1.1 loaded - Type |cff00ff00/cvm|r to open")
 end
 
 frame:RegisterEvent("PLAYER_LOGIN")
