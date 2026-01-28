@@ -153,28 +153,20 @@ local function CreateFontSection(parent)
     faceLabel:SetText("Font:")
     faceLabel:SetTextColor(0.7, 0.7, 0.7)
 
-    local faceDropdown = CreateFrame("Frame", "CVarMasterFontFaceDropdown", section, "UIDropDownMenuTemplate")
-    faceDropdown:SetPoint("LEFT", faceLabel, "RIGHT", -8, 0)
-    UIDropDownMenu_SetWidth(faceDropdown, 180)
+    local faceDropdown = CreateFrame("DropdownButton", "CVarMasterFontFaceDropdown", section, "WowStyle1DropdownTemplate")
+    faceDropdown:SetPoint("LEFT", faceLabel, "RIGHT", 0, 0)
+    faceDropdown:SetWidth(200)
+    faceDropdown:SetDefaultText("Select Font")
 
-    local function InitFaceDropdown(self, level)
-        local currentSettings = TM:GetFontSettings()
-        local info = UIDropDownMenu_CreateInfo()
+    faceDropdown:SetupMenu(function(dropdown, rootDescription)
         for _, font in ipairs(TM.AVAILABLE_FONTS) do
-            info.text = font.name
-            info.value = font.path
-            info.checked = (currentSettings.face == font.path)
-            info.func = function()
-                UIDropDownMenu_SetSelectedValue(faceDropdown, font.path)
-                UIDropDownMenu_SetText(faceDropdown, font.name)
+            rootDescription:CreateRadio(font.name, function()
+                return TM:GetFontSettings().face == font.path
+            end, function()
                 TM:SetFontFace(font.path)
-            end
-            UIDropDownMenu_AddButton(info, level)
+            end, font.path)
         end
-    end
-
-    UIDropDownMenu_Initialize(faceDropdown, InitFaceDropdown)
-    UIDropDownMenu_SetText(faceDropdown, TM:GetFontFaceName())
+    end)
     section.faceDropdown = faceDropdown
 
     -- Row 2: Font Size (y = -78)
@@ -215,33 +207,20 @@ local function CreateFontSection(parent)
     outlineLabel:SetText("Outline:")
     outlineLabel:SetTextColor(0.7, 0.7, 0.7)
 
-    local outlineDropdown = CreateFrame("Frame", "CVarMasterFontOutlineDropdown", section, "UIDropDownMenuTemplate")
-    outlineDropdown:SetPoint("LEFT", outlineLabel, "RIGHT", -8, 0)
-    UIDropDownMenu_SetWidth(outlineDropdown, 130)
+    local outlineDropdown = CreateFrame("DropdownButton", "CVarMasterFontOutlineDropdown", section, "WowStyle1DropdownTemplate")
+    outlineDropdown:SetPoint("LEFT", outlineLabel, "RIGHT", 0, 0)
+    outlineDropdown:SetWidth(150)
+    outlineDropdown:SetDefaultText("Select Outline")
 
-    local function InitOutlineDropdown(self, level)
-        local info = UIDropDownMenu_CreateInfo()
+    outlineDropdown:SetupMenu(function(dropdown, rootDescription)
         for _, opt in ipairs(TM.FONT_FLAGS) do
-            info.text = opt.name
-            info.value = opt.flag
-            info.checked = (settings.flags == opt.flag)
-            info.func = function()
-                UIDropDownMenu_SetSelectedValue(outlineDropdown, opt.flag)
-                UIDropDownMenu_SetText(outlineDropdown, opt.name)
+            rootDescription:CreateRadio(opt.name, function()
+                return TM:GetFontSettings().flags == opt.flag
+            end, function()
                 TM:SetFontFlags(opt.flag)
-            end
-            UIDropDownMenu_AddButton(info, level)
+            end, opt.flag)
         end
-    end
-
-    UIDropDownMenu_Initialize(outlineDropdown, InitOutlineDropdown)
-
-    for _, opt in ipairs(TM.FONT_FLAGS) do
-        if opt.flag == settings.flags then
-            UIDropDownMenu_SetText(outlineDropdown, opt.name)
-            break
-        end
-    end
+    end)
 
     -- Row 4: Shadow X and Y (y = -158)
     local shadowXLabel = section:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
@@ -346,15 +325,9 @@ local function CreateFontSection(parent)
         shadowXSlider:SetValue(newSettings.shadowOffsetX)
         shadowYSlider:SetValue(newSettings.shadowOffsetY)
         shadowAlphaSlider:SetValue(newSettings.shadowColorA)
-        -- Reset font face dropdown
-        UIDropDownMenu_SetText(faceDropdown, TM:GetFontFaceName())
-        -- Reset outline dropdown
-        for _, opt in ipairs(TM.FONT_FLAGS) do
-            if opt.flag == newSettings.flags then
-                UIDropDownMenu_SetText(outlineDropdown, opt.name)
-                break
-            end
-        end
+        -- Reset dropdowns (re-evaluate selected state)
+        faceDropdown:GenerateMenu()
+        outlineDropdown:GenerateMenu()
     end)
     resetFontBtn:SetScript("OnEnter", function(self)
         self:SetBackdropColor(0.3, 0.15, 0.15, 1)
@@ -469,15 +442,10 @@ function GUI:ShowThemeWindow()
                 _G["CVarMasterShadowAlphaSlider"]:SetValue(newSettings.shadowColorA)
             end
             if _G["CVarMasterFontFaceDropdown"] then
-                UIDropDownMenu_SetText(_G["CVarMasterFontFaceDropdown"], TM:GetFontFaceName())
+                _G["CVarMasterFontFaceDropdown"]:GenerateMenu()
             end
             if _G["CVarMasterFontOutlineDropdown"] then
-                for _, opt in ipairs(TM.FONT_FLAGS) do
-                    if opt.flag == newSettings.flags then
-                        UIDropDownMenu_SetText(_G["CVarMasterFontOutlineDropdown"], opt.name)
-                        break
-                    end
-                end
+                _G["CVarMasterFontOutlineDropdown"]:GenerateMenu()
             end
         end)
         resetAllBtn:SetScript("OnEnter", function(self)

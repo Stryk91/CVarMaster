@@ -1168,4 +1168,13 @@ CVarMaster.KnownCVars = {
     "targetFPS",
     "TerrainLodDiv",
     "useHighResolutionUITextures",
+    -- 12.0 SECRET VALUES / ADDON RESTRICTIONS
+    "addonChatRestrictionsForced",
+    "secretAurasForced",
+    "secretCooldownsForced",
+    "secretSpellcastsForced",
+    "secretUnitComparisonForced",
+    "secretUnitIdentityForced",
+    "secretUnitPowerForced",
+    "secretUnitPowerMaxForced",
 }

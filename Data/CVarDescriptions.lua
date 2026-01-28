@@ -1835,4 +1835,13 @@ CVarMaster.CVarPrettyNames = {
     ["pingCategoryTutorialShown"] = "Ping Tutorial Shown",
     -- PREEMPTIVE CAST
     ["PreemptiveCastEnable"] = "Preemptive Cast",
+    -- 12.0 SECRET VALUES / ADDON RESTRICTIONS
+    ["addonChatRestrictionsForced"] = "Force Addon Chat Restrictions",
+    ["secretAurasForced"] = "Force Secret Auras (hide buff/debuff details)",
+    ["secretCooldownsForced"] = "Force Secret Cooldowns (hide cooldown info)",
+    ["secretSpellcastsForced"] = "Force Secret Spellcasts (hide cast details)",
+    ["secretUnitComparisonForced"] = "Force Secret Unit Comparison (hide compare data)",
+    ["secretUnitIdentityForced"] = "Force Secret Unit Identity (hide unit names)",
+    ["secretUnitPowerForced"] = "Force Secret Unit Power (hide resource values)",
+    ["secretUnitPowerMaxForced"] = "Force Secret Unit Power Max (hide max resources)",
 }

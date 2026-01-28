@@ -1,5 +1,17 @@
 # CVarMaster Changelog
 
+## [1.2.0] - 2026-01-29
+
+### Added
+- 8 new 12.0 Secret Values / Addon Restriction CVars (secretAurasForced, secretCooldownsForced, secretSpellcastsForced, secretUnitComparisonForced, secretUnitIdentityForced, secretUnitPowerForced, secretUnitPowerMaxForced, addonChatRestrictionsForced)
+
+### Improved
+- Migrated UIDropDownMenu to MenuUtil/DropdownButton API (WoW 12.0 future-proof)
+- Updated Interface version to 120000 for WoW 12.0 Midnight
+
+### Bug Fixes
+- Fixed profile import dialog: text box no longer extends off screen when pasting long strings. EditBox is now wrapped in a ScrollFrame with proper overflow handling.
+
 ## [1.1.0] - 2025-12-23
 
 ### Added

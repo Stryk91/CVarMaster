@@ -226,7 +226,7 @@ end
 ---Show import dialog
 function PM:ShowImportDialog()
     local dialog = CreateFrame("Frame", "CVarMasterImportDialog", UIParent, "BackdropTemplate")
-    dialog:SetSize(500, 200)
+    dialog:SetSize(500, 300)
     dialog:SetPoint("CENTER")
     dialog:SetBackdrop({
         bgFile = "Interface\\Buttons\\WHITE8x8",
@@ -250,21 +250,34 @@ function PM:ShowImportDialog()
     info:SetPoint("TOP", title, "BOTTOM", 0, -4)
     info:SetText("|cff888888Paste CVarMaster export string below|r")
 
-    local editBox = CreateFrame("EditBox", nil, dialog, "BackdropTemplate")
-    editBox:SetPoint("TOPLEFT", 12, -50)
-    editBox:SetPoint("TOPRIGHT", -12, -50)
-    editBox:SetHeight(80)
-    editBox:SetMultiLine(true)
-    editBox:SetFontObject(GameFontHighlightSmall)
-    editBox:SetAutoFocus(true)
-    editBox:SetBackdrop({
+    -- Scroll container for the edit box (prevents text overflow)
+    local scrollContainer = CreateFrame("Frame", nil, dialog, "BackdropTemplate")
+    scrollContainer:SetPoint("TOPLEFT", 12, -50)
+    scrollContainer:SetPoint("TOPRIGHT", -12, -50)
+    scrollContainer:SetHeight(180)
+    scrollContainer:SetBackdrop({
         bgFile = "Interface\\Buttons\\WHITE8x8",
         edgeFile = "Interface\\Buttons\\WHITE8x8",
         edgeSize = 1,
     })
-    editBox:SetBackdropColor(0.1, 0.1, 0.12, 1)
-    editBox:SetBackdropBorderColor(0.3, 0.3, 0.3, 1)
+    scrollContainer:SetBackdropColor(0.1, 0.1, 0.12, 1)
+    scrollContainer:SetBackdropBorderColor(0.3, 0.3, 0.3, 1)
+
+    local scrollFrame = CreateFrame("ScrollFrame", "CVarMasterImportScroll", scrollContainer, "UIPanelScrollFrameTemplate")
+    scrollFrame:SetPoint("TOPLEFT", 4, -4)
+    scrollFrame:SetPoint("BOTTOMRIGHT", -22, 4)
+
+    local editBox = CreateFrame("EditBox", nil, scrollFrame)
+    editBox:SetWidth(scrollFrame:GetWidth() or 440)
+    editBox:SetMultiLine(true)
+    editBox:SetFontObject(GameFontHighlightSmall)
+    editBox:SetAutoFocus(true)
     editBox:SetTextInsets(8, 8, 4, 4)
+    scrollFrame:SetScrollChild(editBox)
+
+    editBox:SetScript("OnShow", function(self)
+        self:SetWidth(scrollFrame:GetWidth())
+    end)
 
     local closeBtn = CreateFrame("Button", nil, dialog, "UIPanelCloseButton")
     closeBtn:SetPoint("TOPRIGHT", -2, -2)

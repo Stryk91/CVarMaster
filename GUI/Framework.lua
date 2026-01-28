@@ -227,27 +227,26 @@ end
 ---@param options table Array of {text, value} options
 ---@return Frame dropdown
 function GUI:CreateDropdown(name, parent, width, options)
-    local dropdown = CreateFrame("Frame", name, parent, "UIDropDownMenuTemplate")
-    UIDropDownMenu_SetWidth(dropdown, width or 150)
-    
-    local function Initialize(self, level)
-        local info = UIDropDownMenu_CreateInfo()
+    local dropdown = CreateFrame("DropdownButton", name, parent, "WowStyle1DropdownTemplate")
+    dropdown:SetWidth(width or 150)
+    dropdown:SetDefaultText("Select...")
+
+    -- Track selected value for external access
+    dropdown.selectedValue = nil
+
+    dropdown:SetupMenu(function(dd, rootDescription)
         for _, opt in ipairs(options) do
-            info.text = opt.text
-            info.value = opt.value
-            info.func = function()
-                UIDropDownMenu_SetSelectedValue(dropdown, opt.value)
-                UIDropDownMenu_SetText(dropdown, opt.text)
+            rootDescription:CreateRadio(opt.text, function()
+                return dropdown.selectedValue == opt.value
+            end, function()
+                dropdown.selectedValue = opt.value
                 if dropdown.OnValueChanged then
                     dropdown:OnValueChanged(opt.value)
                 end
-            end
-            UIDropDownMenu_AddButton(info, level)
+            end, opt.value)
         end
-    end
-    
-    UIDropDownMenu_Initialize(dropdown, Initialize)
-    
+    end)
+
     return dropdown
 end
 
