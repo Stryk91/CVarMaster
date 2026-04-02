@@ -4,7 +4,7 @@ local ADDON_NAME, CVarMaster = ...
 CVarMaster.CVarManager = {}
 local Manager = CVarMaster.CVarManager
 
--- Backup storage
+-- Backup storage (single-CVar backups are session-only; full backups persist to DB)
 local backups = {}
 
 -- CVars that need confirmation/reload before taking effect
@@ -173,13 +173,18 @@ function Manager:BackupCVar(cvarName)
     end
 end
 
----Backup all CVars
+---Backup all CVars (persists to SavedVariables)
 function Manager:BackupAll()
     local cvars = CVarMaster.CVarScanner:GetCachedCVars()
     backups.full = {}
 
     for name, data in pairs(cvars) do
         backups.full[name] = data.value
+    end
+
+    -- Persist to DB so backups survive /reload
+    if CVarMaster.db then
+        CVarMaster.db.backup = backups.full
     end
 
     local count = 0
@@ -194,7 +199,8 @@ function Manager:RestoreBackup(full)
         return 0
     end
 
-    local backup = full and backups.full or backups.single
+    -- Try session backup first, then persisted DB backup
+    local backup = full and (backups.full or (CVarMaster.db and CVarMaster.db.backup)) or backups.single
     if not backup then
         print("|cffff0000CVarMaster:|r No backup found")
         return 0
@@ -216,14 +222,65 @@ end
 function Manager:GetBackupInfo()
     local singleCount, fullCount = 0, 0
     if backups.single then for _ in pairs(backups.single) do singleCount = singleCount + 1 end end
-    if backups.full then for _ in pairs(backups.full) do fullCount = fullCount + 1 end end
-    
+    local fullBackup = backups.full or (CVarMaster.db and CVarMaster.db.backup)
+    if fullBackup then for _ in pairs(fullBackup) do fullCount = fullCount + 1 end end
+
     return {
         hasSingleBackup = backups.single ~= nil,
-        hasFullBackup = backups.full ~= nil,
+        hasFullBackup = fullBackup ~= nil,
         singleCount = singleCount,
         fullCount = fullCount,
     }
+end
+
+---Compare current CVar values against saved backup, print drifted ones
+function Manager:CompareToBackup()
+    local backup = backups.full or (CVarMaster.db and CVarMaster.db.backup)
+    if not backup then
+        print("|cffff0000CVarMaster:|r No backup found. Hit Backup first, then /reload to test.")
+        return
+    end
+
+    local drifted = {}
+    local matched = 0
+    local total = 0
+
+    for name, savedValue in pairs(backup) do
+        total = total + 1
+        local currentValue = GetCVar(name)
+        if currentValue == nil then
+            -- CVar no longer exists
+            table.insert(drifted, { name = name, saved = savedValue, current = "NIL", reason = "removed" })
+        elseif tostring(currentValue) ~= tostring(savedValue) then
+            table.insert(drifted, { name = name, saved = savedValue, current = currentValue, reason = "changed" })
+        else
+            matched = matched + 1
+        end
+    end
+
+    -- Sort by name
+    table.sort(drifted, function(a, b) return a.name < b.name end)
+
+    print("|cff00aaffCVarMaster|r: Backup comparison — " .. total .. " CVars checked")
+    print("|cff00ff00  Held:|r " .. matched .. "  |cffff4444Drifted:|r " .. #drifted)
+
+    if #drifted > 0 then
+        print("|cffff8800  --- Drifted CVars (need lock to persist) ---|r")
+        for _, d in ipairs(drifted) do
+            local savedStr = tostring(d.saved)
+            local currentStr = tostring(d.current)
+            -- Truncate long values
+            if #savedStr > 20 then savedStr = savedStr:sub(1, 17) .. "..." end
+            if #currentStr > 20 then currentStr = currentStr:sub(1, 17) .. "..." end
+            print(string.format("  |cffcccccc%s|r: |cffff4444%s|r -> |cff44ff44%s|r", d.name, savedStr, currentStr))
+        end
+    else
+        print("|cff00ff00  All CVars held their values!|r")
+    end
+
+    -- Store results for GUI access
+    CVarMaster.lastCompare = { drifted = drifted, matched = matched, total = total }
+    return drifted
 end
 
 ---Check if CVar is combat protected
@@ -309,33 +366,33 @@ function Manager:GetLockedCVars()
     return CVarMaster.charDB.lockedCVars
 end
 
----Apply all locked CVars (called on PLAYER_LOGIN)
+---Apply all locked CVars (called after loading screen)
 ---@return number count Number of CVars applied
 function Manager:ApplyLockedCVars()
     local locked = self:GetLockedCVars()
     local count = 0
     local failed = 0
+    local debug = CVarMaster.db and CVarMaster.db.global and CVarMaster.db.global.debug
 
     for cvarName, value in pairs(locked) do
-        local currentValue = GetCVar(cvarName)
-        if currentValue ~= nil then
-            if currentValue ~= value then
-                SetCVar(cvarName, value)
-                count = count + 1
+        local before = GetCVar(cvarName)
+        if before ~= nil then
+            local lockedStr = tostring(value)
+            -- Try both SetCVar and C_CVar API
+            SetCVar(cvarName, lockedStr)
+            if C_CVar and C_CVar.SetCVar then
+                C_CVar.SetCVar(cvarName, lockedStr)
             end
+            local after = GetCVar(cvarName)
+            if debug then
+                local status = (tostring(after) == lockedStr) and "|cff00ff00OK|r" or "|cffff0000FAIL|r"
+                print("  " .. cvarName .. ": " .. tostring(before) .. " -> " .. tostring(after) .. " (want: " .. lockedStr .. ") " .. status)
+            end
+            count = count + 1
         else
-            -- CVar no longer exists, remove from locks
             CVarMaster.charDB.lockedCVars[cvarName] = nil
             failed = failed + 1
         end
-    end
-
-    if count > 0 or failed > 0 then
-        local msg = "|cff00aaffCVarMaster:|r Applied " .. count .. " locked CVar(s)"
-        if failed > 0 then
-            msg = msg .. " |cff888888(" .. failed .. " removed - no longer exist)|r"
-        end
-        print(msg)
     end
 
     return count
@@ -353,4 +410,142 @@ function Manager:ToggleLock(cvarName)
         self:LockCVar(cvarName)
         return true
     end
+end
+
+-- ============================================================================
+-- FORCE CUSTOM SYSTEM
+-- Special settings that override the game defaults every login
+-- ============================================================================
+
+---Apply Force Custom settings (called on PLAYER_LOGIN)
+function Manager:ApplyForceCustom()
+    if not CVarMaster.charDB or not CVarMaster.charDB.forceCustom then
+        return 0
+    end
+
+    local forceCustom = CVarMaster.charDB.forceCustom
+    local count = 0
+
+    -- Force gxMaxFrameLatency to 1 if enabled
+    if forceCustom.gxMaxFrameLatency1 then
+        local current = GetCVar("GxMaxFrameLatency")
+        if current ~= "1" then
+            SetCVar("GxMaxFrameLatency", "1")
+            count = count + 1
+        end
+    end
+
+    if count > 0 then
+        print("|cff00aaffCVarMaster:|r Applied " .. count .. " Force Custom setting(s)")
+    end
+
+    return count
+end
+
+---Set Force Custom option
+---@param option string The option key (e.g., "gxMaxFrameLatency1")
+---@param enabled boolean Whether to enable the force
+function Manager:SetForceCustom(option, enabled)
+    if not CVarMaster.charDB then
+        CVarMaster.charDB = {}
+    end
+    if not CVarMaster.charDB.forceCustom then
+        CVarMaster.charDB.forceCustom = {}
+    end
+
+    CVarMaster.charDB.forceCustom[option] = enabled
+
+    -- Apply immediately
+    if option == "gxMaxFrameLatency1" then
+        if enabled then
+            SetCVar("GxMaxFrameLatency", "1")
+            print("|cff00aaffCVarMaster:|r Forced |cffffaa00GxMaxFrameLatency|r to |cff00ff001|r (Triple Buffering override)")
+        else
+            -- Don't reset it, just stop enforcing
+            print("|cff00aaffCVarMaster:|r Stopped forcing |cffffaa00GxMaxFrameLatency|r")
+        end
+    end
+end
+
+---Get Force Custom option state
+---@param option string The option key
+---@return boolean enabled
+function Manager:GetForceCustom(option)
+    if not CVarMaster.charDB or not CVarMaster.charDB.forceCustom then
+        return false
+    end
+    return CVarMaster.charDB.forceCustom[option] or false
+end
+
+---Get all Force Custom settings
+---@return table settings
+function Manager:GetAllForceCustom()
+    if not CVarMaster.charDB or not CVarMaster.charDB.forceCustom then
+        return {}
+    end
+    return CVarMaster.charDB.forceCustom
+end
+
+---Lock all modified CVars from active profile
+---@return number count Number of CVars locked
+function Manager:LockActiveProfile()
+    local activeProfile = CVarMaster.ProfileManager and CVarMaster.ProfileManager:GetActiveProfile()
+    if not activeProfile then
+        print("|cffff0000CVarMaster:|r No active profile set")
+        return 0
+    end
+
+    if not CVarMaster.db.profiles or not CVarMaster.db.profiles[activeProfile] then
+        print("|cffff0000CVarMaster:|r Profile not found: " .. activeProfile)
+        return 0
+    end
+
+    local profile = CVarMaster.db.profiles[activeProfile]
+    local count = 0
+
+    -- Ensure lockedCVars table exists
+    if not CVarMaster.charDB then CVarMaster.charDB = {} end
+    if not CVarMaster.charDB.lockedCVars then CVarMaster.charDB.lockedCVars = {} end
+
+    -- Lock all CVars in the profile
+    for cvarName, value in pairs(profile.cvars) do
+        CVarMaster.charDB.lockedCVars[cvarName] = value
+        count = count + 1
+    end
+
+    print("|cff00aaffCVarMaster:|r Locked |cff00ff00" .. count .. "|r CVars from profile |cffffaa00" .. activeProfile .. "|r")
+    return count
+end
+
+---Unlock all CVars from active profile
+---@return number count Number of CVars unlocked
+function Manager:UnlockActiveProfile()
+    local activeProfile = CVarMaster.ProfileManager and CVarMaster.ProfileManager:GetActiveProfile()
+    if not activeProfile then
+        print("|cffff0000CVarMaster:|r No active profile set")
+        return 0
+    end
+
+    if not CVarMaster.db.profiles or not CVarMaster.db.profiles[activeProfile] then
+        print("|cffff0000CVarMaster:|r Profile not found: " .. activeProfile)
+        return 0
+    end
+
+    if not CVarMaster.charDB or not CVarMaster.charDB.lockedCVars then
+        return 0
+    end
+
+    local profile = CVarMaster.db.profiles[activeProfile]
+    local count = 0
+
+    -- Unlock all CVars that are in the profile
+    for cvarName in pairs(profile.cvars) do
+        if CVarMaster.charDB.lockedCVars[cvarName] then
+            CVarMaster.charDB.lockedCVars[cvarName] = nil
+            count = count + 1
+        end
+    end
+
+    print("|cff00aaffCVarMaster:|r Unlocked |cffff8800" .. count .. "|r CVars from profile |cffffaa00" .. activeProfile .. "|r")
+    return count
 end

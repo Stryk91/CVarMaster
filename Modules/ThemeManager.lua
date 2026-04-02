@@ -234,8 +234,13 @@ TM.PRESETS = {
 -- ==========================================
 -- FONT SETTINGS
 -- ==========================================
+-- Bundled font (ships with CVarMaster)
+local BUNDLED_FONT = "Interface\\AddOns\\CVarMaster\\Fonts\\Kanit-Medium.ttf"
+
+-- Available fonts (bundled first, then WoW built-ins)
 TM.AVAILABLE_FONTS = {
-    { name = "Fritz Quadrata (Default)", path = "Fonts\\FRIZQT__.TTF" },
+    { name = "Kanit Medium", path = BUNDLED_FONT },
+    { name = "Fritz Quadrata", path = "Fonts\\FRIZQT__.TTF" },
     { name = "Arial Narrow", path = "Fonts\\ARIALN.TTF" },
     { name = "Morpheus", path = "Fonts\\MORPHEUS.TTF" },
     { name = "Skurri", path = "Fonts\\SKURRI.TTF" },
@@ -244,6 +249,55 @@ TM.AVAILABLE_FONTS = {
     { name = "Expressway", path = "Fonts\\EXPRESSWAY.TTF" },
     { name = "Nimrod", path = "Fonts\\NIM_____.TTF" },
 }
+
+-- Custom fonts from SharedMedia_MyMedia
+local SMAF_PATH = "Interface\\AddOns\\SharedMedia_MyMedia\\font\\"
+local CUSTOM_FONTS = {
+    { name = "Accidental Presidency", path = SMAF_PATH .. "Accidental Presidency.ttf" },
+    { name = "Action Man", path = SMAF_PATH .. "ActionMan.ttf" },
+    { name = "Albas", path = SMAF_PATH .. "ALBAS___.ttf" },
+    { name = "Arm Wrestler", path = SMAF_PATH .. "ArmWrestler.ttf" },
+    { name = "Baars", path = SMAF_PATH .. "BAARS___.TTF" },
+    { name = "Blazed", path = SMAF_PATH .. "Blazed.ttf" },
+    { name = "Boris Black Bloxx", path = SMAF_PATH .. "BorisBlackBloxx.ttf" },
+    { name = "Boris Black Bloxx Dirty", path = SMAF_PATH .. "BorisBlackBloxxDirty.ttf" },
+    { name = "Collegia", path = SMAF_PATH .. "COLLEGIA.ttf" },
+    { name = "Continuum Medium", path = SMAF_PATH .. "ContinuumMedium.ttf" },
+    { name = "DejaVu Sans", path = SMAF_PATH .. "DejaVuSans.ttf" },
+    { name = "DejaVu Sans Bold", path = SMAF_PATH .. "DejaVuSans-Bold.ttf" },
+    { name = "Die Die Die", path = SMAF_PATH .. "DieDieDie.ttf" },
+    { name = "Diogenes", path = SMAF_PATH .. "DIOGENES.ttf" },
+    { name = "Disko", path = SMAF_PATH .. "Disko.ttf" },
+    { name = "Expressway Bold", path = SMAF_PATH .. "Expressway-Bold.ttf" },
+    { name = "Homespun", path = SMAF_PATH .. "Homespun.ttf" },
+    { name = "Impact", path = SMAF_PATH .. "impact.ttf" },
+    { name = "Kanit Black", path = SMAF_PATH .. "Kanit-Black.ttf" },
+    { name = "Kanit Bold", path = SMAF_PATH .. "Kanit-Bold.ttf" },
+    { name = "Kanit ExtraBold", path = SMAF_PATH .. "Kanit-ExtraBold.ttf" },
+    { name = "Kanit Light", path = SMAF_PATH .. "Kanit-Light.ttf" },
+    { name = "Kanit SemiBold", path = SMAF_PATH .. "Kanit-SemiBold.ttf" },
+    { name = "Liberation Sans", path = SMAF_PATH .. "LiberationSans-Regular.ttf" },
+    { name = "Liberation Serif", path = SMAF_PATH .. "LiberationSerif-Regular.ttf" },
+    { name = "Mystik Orbs", path = SMAF_PATH .. "MystikOrbs.ttf" },
+    { name = "Pokemon Solid", path = SMAF_PATH .. "Pokemon Solid.ttf" },
+    { name = "PT Sans Narrow Bold", path = SMAF_PATH .. "PTSansNarrow-Bold.ttf" },
+    { name = "Rock Show Whiplash", path = SMAF_PATH .. "Rock Show Whiplash.ttf" },
+    { name = "SF Diego Sans", path = SMAF_PATH .. "SF Diego Sans.ttf" },
+    { name = "Solange", path = SMAF_PATH .. "Solange.ttf" },
+    { name = "Starcine", path = SMAF_PATH .. "starcine.ttf" },
+    { name = "Trashco", path = SMAF_PATH .. "trashco.ttf" },
+    { name = "Ubuntu Condensed", path = SMAF_PATH .. "Ubuntu-C.ttf" },
+    { name = "Ubuntu Light", path = SMAF_PATH .. "Ubuntu-L.ttf" },
+    { name = "Verdana", path = SMAF_PATH .. "Verdana.ttf" },
+    { name = "Waltograph UI", path = SMAF_PATH .. "waltographUI.ttf" },
+    { name = "X360", path = SMAF_PATH .. "X360.ttf" },
+    { name = "Yanone Kaffeesatz", path = SMAF_PATH .. "YanoneKaffeesatz-Regular.ttf" },
+}
+
+-- Merge custom fonts into available fonts
+for _, font in ipairs(CUSTOM_FONTS) do
+    table.insert(TM.AVAILABLE_FONTS, font)
+end
 
 TM.FONT_FLAGS = {
     { name = "None", flag = "" },
@@ -255,9 +309,9 @@ TM.FONT_FLAGS = {
 
 -- Default font settings
 TM.DEFAULT_FONT_SETTINGS = {
-    face = "Fonts\\FRIZQT__.TTF",
-    size = 12,
-    flags = "OUTLINE",
+    face = "Interface\\AddOns\\CVarMaster\\Fonts\\Kanit-Medium.ttf",
+    size = 15,
+    flags = "",
     shadowOffsetX = 1,
     shadowOffsetY = -1,
     shadowColorR = 0,
@@ -368,9 +422,8 @@ function TM:RegisterFontString(fontString, sizeType)
 end
 
 function TM:RefreshAllFonts()
-    -- Font objects auto-propagate to font strings using SetFontObject
-    -- We only need to update the font objects themselves (done in UpdateFontObjects)
-    -- No need to rebuild UI - just let WoW handle the propagation
+    local settings = self:GetFontSettings()
+    CVarMaster.GUI:RefreshFonts(settings)
 end
 
 function TM:GetFontObject(sizeType)
@@ -442,10 +495,28 @@ end
 -- FONT MANAGEMENT
 -- ==========================================
 function TM:GetFontSettings()
+    local d = TM.DEFAULT_FONT_SETTINGS
     if CVarMasterDB and CVarMasterDB.theme and CVarMasterDB.theme.font then
-        return CVarMasterDB.theme.font
+        local s = CVarMasterDB.theme.font
+        -- Migrate old SharedMedia Kanit path to bundled version
+        local face = s.face or d.face
+        if face and face:find("SharedMedia") and face:find("Kanit%-Medium") then
+            face = "Interface\\AddOns\\CVarMaster\\Fonts\\Kanit-Medium.ttf"
+            s.face = face -- persist migration
+        end
+        return {
+            face = face,
+            size = s.size or d.size,
+            flags = s.flags or d.flags,
+            shadowOffsetX = s.shadowOffsetX or d.shadowOffsetX,
+            shadowOffsetY = s.shadowOffsetY or d.shadowOffsetY,
+            shadowColorR = s.shadowColorR or d.shadowColorR,
+            shadowColorG = s.shadowColorG or d.shadowColorG,
+            shadowColorB = s.shadowColorB or d.shadowColorB,
+            shadowColorA = s.shadowColorA or d.shadowColorA,
+        }
     end
-    return TM.DEFAULT_FONT_SETTINGS
+    return d
 end
 
 function TM:SetFontFace(path)

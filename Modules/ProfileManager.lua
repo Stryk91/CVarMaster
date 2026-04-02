@@ -7,11 +7,17 @@ local PM = CVarMaster.ProfileManager
 ---Save current CVars as named profile
 ---@param profileName string Profile name
 ---@param includeAll? boolean Include all CVars (default: only modified)
+---@param setActive? boolean Set as active profile (default: true)
 ---@return boolean success
-function PM:SaveProfile(profileName, includeAll)
+function PM:SaveProfile(profileName, includeAll, setActive)
     if not profileName or profileName == "" then
         CVarMaster.Utils.Error("Profile name required")
         return false
+    end
+
+    -- Default setActive to true
+    if setActive == nil then
+        setActive = true
     end
 
     local profile = {
@@ -34,6 +40,11 @@ function PM:SaveProfile(profileName, includeAll)
     end
 
     CVarMaster.db.profiles[profileName] = profile
+
+    -- Track as active profile
+    if setActive and CVarMaster.charDB then
+        CVarMaster.charDB.activeProfile = profileName
+    end
 
     local count = 0
     for _ in pairs(profile.cvars) do count = count + 1 end
@@ -64,8 +75,30 @@ function PM:LoadProfile(profileName)
         end
     end
 
+    -- Track active profile
+    if CVarMaster.charDB then
+        CVarMaster.charDB.activeProfile = profileName
+    end
+
     CVarMaster.Utils.Print("Loaded profile '" .. profileName .. "' -", count, "CVars applied")
     return true
+end
+
+---Get active profile name
+---@return string|nil profileName
+function PM:GetActiveProfile()
+    if CVarMaster.charDB then
+        return CVarMaster.charDB.activeProfile
+    end
+    return nil
+end
+
+---Set active profile (for tracking without loading)
+---@param profileName string|nil
+function PM:SetActiveProfile(profileName)
+    if CVarMaster.charDB then
+        CVarMaster.charDB.activeProfile = profileName
+    end
 end
 
 ---Delete profile
@@ -223,88 +256,96 @@ function PM:ImportProfile(importString, newName)
     return true
 end
 
----Show import dialog
+-- Reusable import dialog (created once)
+local importDialog = nil
+local importEditBox = nil
+
+---Show import dialog (creates once, reuses)
 function PM:ShowImportDialog()
-    local dialog = CreateFrame("Frame", "CVarMasterImportDialog", UIParent, "BackdropTemplate")
-    dialog:SetSize(500, 300)
-    dialog:SetPoint("CENTER")
-    dialog:SetBackdrop({
-        bgFile = "Interface\\Buttons\\WHITE8x8",
-        edgeFile = "Interface\\Buttons\\WHITE8x8",
-        edgeSize = 1,
-    })
-    dialog:SetBackdropColor(0.05, 0.05, 0.08, 0.95)
-    dialog:SetBackdropBorderColor(0, 0.6, 1, 0.8)
-    dialog:SetFrameStrata("DIALOG")
-    dialog:SetMovable(true)
-    dialog:EnableMouse(true)
-    dialog:RegisterForDrag("LeftButton")
-    dialog:SetScript("OnDragStart", dialog.StartMoving)
-    dialog:SetScript("OnDragStop", dialog.StopMovingOrSizing)
+    if not importDialog then
+        local dialog = CreateFrame("Frame", "CVarMasterImportDialog", UIParent, "BackdropTemplate")
+        dialog:SetSize(500, 300)
+        dialog:SetPoint("CENTER")
+        dialog:SetBackdrop({
+            bgFile = "Interface\\Buttons\\WHITE8x8",
+            edgeFile = "Interface\\Buttons\\WHITE8x8",
+            edgeSize = 1,
+        })
+        dialog:SetBackdropColor(0.05, 0.05, 0.08, 0.95)
+        dialog:SetBackdropBorderColor(0, 0.6, 1, 0.8)
+        dialog:SetFrameStrata("DIALOG")
+        dialog:SetMovable(true)
+        dialog:EnableMouse(true)
+        dialog:RegisterForDrag("LeftButton")
+        dialog:SetScript("OnDragStart", dialog.StartMoving)
+        dialog:SetScript("OnDragStop", dialog.StopMovingOrSizing)
 
-    local title = dialog:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    title:SetPoint("TOP", 0, -10)
-    title:SetText("|cff00ff00Import Profile|r")
+        local title = dialog:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+        title:SetPoint("TOP", 0, -10)
+        title:SetText("|cff00ff00Import Profile|r")
 
-    local info = dialog:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    info:SetPoint("TOP", title, "BOTTOM", 0, -4)
-    info:SetText("|cff888888Paste CVarMaster export string below|r")
+        local info = dialog:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        info:SetPoint("TOP", title, "BOTTOM", 0, -4)
+        info:SetText("|cff888888Paste CVarMaster export string below|r")
 
-    -- Scroll container for the edit box (prevents text overflow)
-    local scrollContainer = CreateFrame("Frame", nil, dialog, "BackdropTemplate")
-    scrollContainer:SetPoint("TOPLEFT", 12, -50)
-    scrollContainer:SetPoint("TOPRIGHT", -12, -50)
-    scrollContainer:SetHeight(180)
-    scrollContainer:SetBackdrop({
-        bgFile = "Interface\\Buttons\\WHITE8x8",
-        edgeFile = "Interface\\Buttons\\WHITE8x8",
-        edgeSize = 1,
-    })
-    scrollContainer:SetBackdropColor(0.1, 0.1, 0.12, 1)
-    scrollContainer:SetBackdropBorderColor(0.3, 0.3, 0.3, 1)
+        local scrollContainer = CreateFrame("Frame", nil, dialog, "BackdropTemplate")
+        scrollContainer:SetPoint("TOPLEFT", 12, -50)
+        scrollContainer:SetPoint("TOPRIGHT", -12, -50)
+        scrollContainer:SetHeight(180)
+        scrollContainer:SetBackdrop({
+            bgFile = "Interface\\Buttons\\WHITE8x8",
+            edgeFile = "Interface\\Buttons\\WHITE8x8",
+            edgeSize = 1,
+        })
+        scrollContainer:SetBackdropColor(0.1, 0.1, 0.12, 1)
+        scrollContainer:SetBackdropBorderColor(0.3, 0.3, 0.3, 1)
 
-    local scrollFrame = CreateFrame("ScrollFrame", "CVarMasterImportScroll", scrollContainer, "UIPanelScrollFrameTemplate")
-    scrollFrame:SetPoint("TOPLEFT", 4, -4)
-    scrollFrame:SetPoint("BOTTOMRIGHT", -22, 4)
+        local scrollFrame = CreateFrame("ScrollFrame", "CVarMasterImportScroll", scrollContainer, "UIPanelScrollFrameTemplate")
+        scrollFrame:SetPoint("TOPLEFT", 4, -4)
+        scrollFrame:SetPoint("BOTTOMRIGHT", -22, 4)
 
-    local editBox = CreateFrame("EditBox", nil, scrollFrame)
-    editBox:SetWidth(scrollFrame:GetWidth() or 440)
-    editBox:SetMultiLine(true)
-    editBox:SetFontObject(GameFontHighlightSmall)
-    editBox:SetAutoFocus(true)
-    editBox:SetTextInsets(8, 8, 4, 4)
-    scrollFrame:SetScrollChild(editBox)
+        local editBox = CreateFrame("EditBox", nil, scrollFrame)
+        editBox:SetWidth(scrollFrame:GetWidth() or 440)
+        editBox:SetMultiLine(true)
+        editBox:SetFontObject(GameFontHighlightSmall)
+        editBox:SetAutoFocus(true)
+        editBox:SetTextInsets(8, 8, 4, 4)
+        scrollFrame:SetScrollChild(editBox)
+        importEditBox = editBox
 
-    editBox:SetScript("OnShow", function(self)
-        self:SetWidth(scrollFrame:GetWidth())
-    end)
+        editBox:SetScript("OnShow", function(self)
+            self:SetWidth(scrollFrame:GetWidth())
+        end)
 
-    local closeBtn = CreateFrame("Button", nil, dialog, "UIPanelCloseButton")
-    closeBtn:SetPoint("TOPRIGHT", -2, -2)
+        local closeBtn = CreateFrame("Button", nil, dialog, "UIPanelCloseButton")
+        closeBtn:SetPoint("TOPRIGHT", -2, -2)
 
-    local importBtn = CreateFrame("Button", nil, dialog, "UIPanelButtonTemplate")
-    importBtn:SetPoint("BOTTOM", -50, 12)
-    importBtn:SetSize(100, 26)
-    importBtn:SetText("Import")
-    importBtn:SetScript("OnClick", function()
-        local text = editBox:GetText()
-        if PM:ImportProfile(text) then
-            dialog:Hide()
-            -- Refresh profile list if visible
-            if CVarMaster.GUI and CVarMaster.GUI.RefreshProfileList then
-                CVarMaster.GUI:RefreshProfileList()
+        local importBtn = CreateFrame("Button", nil, dialog, "UIPanelButtonTemplate")
+        importBtn:SetPoint("BOTTOM", -50, 12)
+        importBtn:SetSize(100, 26)
+        importBtn:SetText("Import")
+        importBtn:SetScript("OnClick", function()
+            local text = importEditBox:GetText()
+            if PM:ImportProfile(text) then
+                dialog:Hide()
+                if CVarMaster.GUI and CVarMaster.GUI.RefreshProfileList then
+                    CVarMaster.GUI:RefreshProfileList()
+                end
             end
-        end
-    end)
+        end)
 
-    local cancelBtn = CreateFrame("Button", nil, dialog, "UIPanelButtonTemplate")
-    cancelBtn:SetPoint("BOTTOM", 50, 12)
-    cancelBtn:SetSize(100, 26)
-    cancelBtn:SetText("Cancel")
-    cancelBtn:SetScript("OnClick", function()
-        dialog:Hide()
-    end)
+        local cancelBtn = CreateFrame("Button", nil, dialog, "UIPanelButtonTemplate")
+        cancelBtn:SetPoint("BOTTOM", 50, 12)
+        cancelBtn:SetSize(100, 26)
+        cancelBtn:SetText("Cancel")
+        cancelBtn:SetScript("OnClick", function() dialog:Hide() end)
 
-    tinsert(UISpecialFrames, "CVarMasterImportDialog")
-    dialog:Show()
+        tinsert(UISpecialFrames, "CVarMasterImportDialog")
+        importDialog = dialog
+    end
+
+    -- Reset and show
+    importEditBox:SetText("")
+    importDialog:Show()
+    importEditBox:SetFocus()
 end

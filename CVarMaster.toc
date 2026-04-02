@@ -1,8 +1,8 @@
-## Interface: 120000
+﻿## Interface: 120001
 ## Title: |cff00aaffCVar|r|cffffffffMaster|r
 ## Notes: The definitive CVar management and configuration tool
 ## Author: Stryker
-## Version: 1.2.0
+## Version: 2.0.0
 ## SavedVariables: CVarMasterDB
 ## SavedVariablesPerCharacter: CVarMasterCharDB
 ## X-Curse-Project-ID: 1410205
@@ -10,7 +10,6 @@
 # Core
 Core\Constants.lua
 Core\Utils.lua
-Core\Database.lua
 
 # Data - CVar mappings and categorization
 Data\KnownCVars.lua
@@ -24,8 +23,6 @@ Data\DangerousCVars.lua
 Modules\CVarScanner.lua
 Modules\CVarManager.lua
 Modules\ProfileManager.lua
-Modules\SafetyManager.lua
-Modules\WeakAuraExport.lua
 Modules\ThemeManager.lua
 
 # GUI Components
@@ -37,6 +34,7 @@ GUI\SearchPanel.lua
 GUI\ProfilePanel.lua
 GUI\ComparisonView.lua
 GUI\ThemePanel.lua
+GUI\ScriptsPanel.lua
 
 # Main
 CVarMaster.lua

@@ -8,59 +8,72 @@ local Constants = CVarMaster.Constants
 local selectedCategory = "All"
 local categoryButtons = {}
 
--- Local theme helper
-local function T(key)
-    if Constants and Constants.THEME and Constants.THEME[key] then
-        return unpack(Constants.THEME[key])
-    end
-    return 0.5, 0.5, 0.5, 1.0
-end
-
-local function S(key)
-    if Constants and Constants.SPACING then
-        return Constants.SPACING[key] or 8
-    end
-    return 8
-end
+-- Use shared theme/spacing helpers from Framework
+local T = GUI.GetThemeColor
+local S = GUI.GetSpacing
 
 -- Category icons using WoW built-in textures
 local CATEGORY_ICONS = {
-    All           = "Interface\\Icons\\INV_Misc_Map_01",
-    Accessibility = "Interface\\Icons\\Spell_Holy_ElunesGrace",
-    Audio         = "Interface\\Icons\\INV_Misc_Ear_Human_01",
-    Camera        = "Interface\\Icons\\INV_Misc_SpyGlass_03",
-    Chat          = "Interface\\Icons\\INV_Letter_15",
-    Combat        = "Interface\\Icons\\Ability_DualWield",
-    Controls      = "Interface\\Icons\\INV_Misc_Gear_01",
-    Graphics      = "Interface\\Icons\\INV_Gizmo_02",
-    Interface     = "Interface\\Icons\\INV_Misc_Book_09",
-    Nameplates    = "Interface\\Icons\\Spell_ChargePositive",
-    Network       = "Interface\\Icons\\INV_Misc_EngGizmos_27",
-    Other         = "Interface\\Icons\\INV_Misc_QuestionMark",
-    Performance   = "Interface\\Icons\\Inv_Misc_PocketWatch_01",
-    ["Raid & Party"] = "Interface\\Icons\\Achievement_BG_winAB_underXminutes",
-    Social        = "Interface\\Icons\\INV_Misc_GroupNeedMore",
-    Targeting     = "Interface\\Icons\\Ability_Hunter_SniperShot",
-    Tooltips      = "Interface\\Icons\\INV_Misc_Note_01",
-    World         = "Interface\\Icons\\INV_Misc_Map08",
+    All           = "Interface\\AddOns\\CVarMaster\\Textures\\icon_all",
+    Accessibility = "Interface\\AddOns\\CVarMaster\\Textures\\icon_accessibility",
+    Audio         = "Interface\\AddOns\\CVarMaster\\Textures\\icon_audio",
+    Camera        = "Interface\\AddOns\\CVarMaster\\Textures\\icon_camera",
+    Chat          = "Interface\\AddOns\\CVarMaster\\Textures\\icon_chat",
+    Combat        = "Interface\\AddOns\\CVarMaster\\Textures\\icon_combat",
+    Controls      = "Interface\\AddOns\\CVarMaster\\Textures\\icon_controls",
+    Graphics      = "Interface\\AddOns\\CVarMaster\\Textures\\icon_graphics",
+    Interface     = "Interface\\AddOns\\CVarMaster\\Textures\\icon_interface",
+    Nameplates    = "Interface\\AddOns\\CVarMaster\\Textures\\icon_nameplates",
+    Network       = "Interface\\AddOns\\CVarMaster\\Textures\\icon_network",
+    Other         = "Interface\\AddOns\\CVarMaster\\Textures\\icon_other",
+    ["New in 12.0"] = "Interface\\AddOns\\CVarMaster\\Textures\\icon_new",
+    Performance   = "Interface\\AddOns\\CVarMaster\\Textures\\icon_performance",
+    ["Raid & Party"] = "Interface\\AddOns\\CVarMaster\\Textures\\icon_raid",
+    Social        = "Interface\\AddOns\\CVarMaster\\Textures\\icon_social",
+    Targeting     = "Interface\\AddOns\\CVarMaster\\Textures\\icon_targeting",
+    Tooltips      = "Interface\\AddOns\\CVarMaster\\Textures\\icon_tooltips",
+    World         = "Interface\\AddOns\\CVarMaster\\Textures\\icon_world",
 }
 
 ---Create the category list
 function GUI:CreateCategoryList(parent)
-    local yOffset = -48 -- Below search box
-    
+    -- Scroll container below search box
+    local scrollFrame = CreateFrame("ScrollFrame", nil, parent)
+    scrollFrame:SetPoint("TOPLEFT", 0, -44)
+    scrollFrame:SetPoint("BOTTOMRIGHT", 0, 42)
+    scrollFrame:EnableMouseWheel(true)
+
+    local scrollChild = CreateFrame("Frame", nil, scrollFrame)
+    scrollChild:SetWidth(Constants.GUI.CATEGORY_WIDTH or 190)
+    scrollFrame:SetScrollChild(scrollChild)
+
+    -- Mouse wheel scrolling
+    scrollFrame:SetScript("OnMouseWheel", function(self, delta)
+        local contentH = scrollChild:GetHeight()
+        local viewH = self:GetHeight()
+        local range = contentH - viewH
+        if range <= 0 then return end
+        local step = 28
+        local current = self:GetVerticalScroll()
+        local newScroll = math.max(0, math.min(range, current - delta * step))
+        self:SetVerticalScroll(newScroll)
+    end)
+
+    local yOffset = -4
+
     -- "All" button first
-    local allBtn = self:CreateCategoryButton(parent, "All", yOffset, "All")
+    local allBtn = self:CreateCategoryButton(scrollChild, "All", yOffset, "All")
     categoryButtons["All"] = allBtn
     yOffset = yOffset - 30
     
     -- Divider
-    local divider = parent:CreateTexture(nil, "ARTWORK")
+    local divider = scrollChild:CreateTexture(nil, "ARTWORK")
     divider:SetHeight(1)
-    divider:SetPoint("LEFT", S("SM"), 0)
-    divider:SetPoint("RIGHT", -S("SM"), 0)
+    divider:SetPoint("LEFT", 16, 0)
+    divider:SetPoint("RIGHT", -16, 0)
     divider:SetPoint("TOP", 0, yOffset)
-    divider:SetColorTexture(T("BORDER_SUBTLE"))
+    if GUI.RegisterAccentTexture then GUI:RegisterAccentTexture(divider, 0.2) end
+    if GUI.DisableSharpening then GUI.DisableSharpening(divider) end
     yOffset = yOffset - S("SM")
     
     -- Category buttons
@@ -71,10 +84,13 @@ function GUI:CreateCategoryList(parent)
     table.sort(categoryNames)
     
     for _, catName in ipairs(categoryNames) do
-        local btn = self:CreateCategoryButton(parent, catName, yOffset, catName)
+        local btn = self:CreateCategoryButton(scrollChild, catName, yOffset, catName)
         categoryButtons[catName] = btn
         yOffset = yOffset - 28
     end
+    
+    -- Set scroll child height to fit all content
+    scrollChild:SetHeight(math.abs(yOffset) + 10)
     
     -- Select "All" by default
     self:SelectCategory("All")
@@ -98,7 +114,8 @@ function GUI:CreateCategoryButton(parent, text, yOffset, categoryKey)
     btn.indicator:SetWidth(3)
     btn.indicator:SetPoint("TOPLEFT", 0, -2)
     btn.indicator:SetPoint("BOTTOMLEFT", 0, 2)
-    btn.indicator:SetColorTexture(T("ACCENT_PRIMARY"))
+    if GUI.RegisterAccentTexture then GUI:RegisterAccentTexture(btn.indicator, 1.0) end
+    if GUI.DisableSharpening then GUI.DisableSharpening(btn.indicator) end
     btn.indicator:Hide()
     
     -- Category icon
@@ -117,6 +134,8 @@ function GUI:CreateCategoryButton(parent, text, yOffset, categoryKey)
     btn.text = btn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     btn.text:SetPoint("LEFT", btn.icon, "RIGHT", S("SM"), 0)
     btn.text:SetText(text)
+    btn.text:SetWordWrap(false)
+    btn.text:SetWidth(120)
     btn.text:SetTextColor(T("CAT_NORMAL"))
     
     -- Count badge
@@ -125,18 +144,23 @@ function GUI:CreateCategoryButton(parent, text, yOffset, categoryKey)
     btn.countText:SetTextColor(T("TEXT_MUTED"))
     btn.countText:SetText("")
     
+    -- Set hover bg color once (we'll fade alpha)
+    btn.bg:SetColorTexture(T("CAT_HOVER_BG"))
+    if GUI.DisableSharpening then GUI.DisableSharpening(btn.bg) end
+    btn.bg:SetAlpha(0)
+
     btn:SetScript("OnEnter", function(self)
         if selectedCategory ~= self.categoryKey then
-            self.bg:SetColorTexture(T("CAT_HOVER_BG"))
+            GUI.SmoothFade(self.bg, 1, 0.12)
             self.icon:SetDesaturated(false)
             self.icon:SetVertexColor(1, 1, 1)
         end
         self.text:SetTextColor(T("TEXT_ACCENT"))
     end)
-    
+
     btn:SetScript("OnLeave", function(self)
         if selectedCategory ~= self.categoryKey then
-            self.bg:SetColorTexture(0, 0, 0, 0)
+            GUI.SmoothFade(self.bg, 0, 0.15)
             self.icon:SetDesaturated(true)
             self.icon:SetVertexColor(0.7, 0.7, 0.7)
             self.text:SetTextColor(T("CAT_NORMAL"))
@@ -157,16 +181,18 @@ function GUI:SelectCategory(categoryKey)
     local oldSelected = selectedCategory
     selectedCategory = categoryKey
     
-    -- Update button states
+    -- Update button states with smooth transitions
     for key, btn in pairs(categoryButtons) do
         if key == categoryKey then
             btn.bg:SetColorTexture(T("CAT_SELECTED_BG"))
+            GUI.SmoothFade(btn.bg, 1, 0.15)
             btn.text:SetTextColor(T("CAT_SELECTED"))
             btn.indicator:Show()
             btn.icon:SetDesaturated(false)
             btn.icon:SetVertexColor(1, 1, 1)
         else
-            btn.bg:SetColorTexture(0, 0, 0, 0)
+            btn.bg:SetColorTexture(T("CAT_HOVER_BG"))
+            GUI.SmoothFade(btn.bg, 0, 0.1)
             btn.text:SetTextColor(T("CAT_NORMAL"))
             btn.indicator:Hide()
             btn.icon:SetDesaturated(true)

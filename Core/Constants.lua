@@ -2,7 +2,7 @@
 local ADDON_NAME, CVarMaster = ...
 
 CVarMaster.Constants = {
-    VERSION = "1.2.0",
+    VERSION = "2.0.0",
 
     -- Display modes
     MODES = {
@@ -36,6 +36,7 @@ CVarMaster.Constants = {
         TARGETING = "Targeting",
         RAID = "Raid & Party",
         WORLD = "World",
+        NEW_12 = "New in 12.0",
         OTHER = "Other",
     },
 
@@ -66,54 +67,59 @@ CVarMaster.Constants = {
     },
 
     -- ==========================================
-    -- THEME v1.1 - Softer Green
+    -- THEME v2.0 - Neutral Slate
     -- ==========================================
     THEME = {
-        -- Backgrounds (darker, slightly warm)
-        BG_PRIMARY     = { 0.09, 0.10, 0.09, 0.97 },   -- Main window
-        BG_SECONDARY   = { 0.06, 0.07, 0.06, 0.95 },   -- Sidebar
-        BG_TERTIARY    = { 0.12, 0.13, 0.12, 1.0 },    -- Input fields, rows
-        BG_HOVER       = { 0.14, 0.18, 0.14, 1.0 },    -- Hover states
-        BG_ACTIVE      = { 0.12, 0.22, 0.12, 1.0 },    -- Selected/active
-        
-        -- Accent colors (softer greens - less neon)
-        ACCENT_PRIMARY   = { 0.35, 0.65, 0.40, 1.0 },  -- Main accent
-        ACCENT_SECONDARY = { 0.28, 0.52, 0.32, 1.0 },  -- Darker accent
-        ACCENT_HIGHLIGHT = { 0.45, 0.78, 0.50, 1.0 },  -- Bright/hover
-        ACCENT_MUTED     = { 0.25, 0.42, 0.28, 0.8 },  -- Subtle accent
-        
+        -- Backgrounds (deep dark)
+        BG_PRIMARY     = { 0.055, 0.045, 0.095, 0.15 },  -- Main window - very transparent for void
+        BG_SECONDARY   = { 0.040, 0.032, 0.075, 0.2 },   -- Sidebar - transparent for void
+        BG_TERTIARY    = { 0.075, 0.065, 0.130, 0.25 },  -- Input fields, rows - transparent for void
+        BG_HOVER       = { 0.095, 0.080, 0.165, 0.4 },   -- Hover states - semi-transparent
+        BG_ACTIVE      = { 0.110, 0.085, 0.200, 0.5 },   -- Selected/active
+
+        -- Accent colors (neutral slate)
+        ACCENT_PRIMARY   = { 0.45, 0.50, 0.55, 1.0 },   -- Slate accent
+        ACCENT_SECONDARY = { 0.35, 0.40, 0.45, 1.0 },   -- Darker slate
+        ACCENT_HIGHLIGHT = { 0.62, 0.50, 0.95, 1.0 },   -- Bright glow
+        ACCENT_MUTED     = { 0.30, 0.34, 0.38, 0.7 },   -- Subtle slate
+        ACCENT_COPPER    = { 0.70, 0.50, 0.35, 1.0 },   -- Copper/bronze accent
+
         -- Text colors
-        TEXT_PRIMARY   = { 0.88, 0.90, 0.88, 1.0 },    -- Main text
-        TEXT_SECONDARY = { 0.62, 0.65, 0.62, 1.0 },    -- Dimmed text
-        TEXT_MUTED     = { 0.45, 0.48, 0.45, 1.0 },    -- Disabled/hint
-        TEXT_ACCENT    = { 0.55, 0.85, 0.58, 1.0 },    -- Highlighted text
-        
-        -- Borders (much softer than before)
-        BORDER_DEFAULT = { 0.25, 0.32, 0.25, 0.5 },    -- Normal borders
-        BORDER_SUBTLE  = { 0.20, 0.25, 0.20, 0.3 },    -- Very subtle
-        BORDER_FOCUS   = { 0.40, 0.65, 0.42, 0.7 },    -- Focused element
-        BORDER_ACCENT  = { 0.35, 0.55, 0.38, 0.6 },    -- Accent border
-        
-        -- Title bar
-        TITLEBAR_BG    = { 0.12, 0.16, 0.12, 0.98 },   -- Title background
-        TITLEBAR_BORDER = { 0.30, 0.45, 0.32, 0.6 },   -- Title border
-        
-        -- Buttons
-        BTN_NORMAL     = { 0.14, 0.16, 0.14, 1.0 },
-        BTN_HOVER      = { 0.18, 0.26, 0.18, 1.0 },
-        BTN_PRESSED    = { 0.12, 0.20, 0.12, 1.0 },
-        BTN_BORDER     = { 0.32, 0.48, 0.35, 0.5 },
-        BTN_BORDER_HOVER = { 0.40, 0.62, 0.42, 0.7 },
-        
+        TEXT_PRIMARY   = { 0.90, 0.90, 0.92, 1.0 },    -- Clean white
+        TEXT_SECONDARY = { 0.60, 0.62, 0.65, 1.0 },    -- Muted grey
+        TEXT_MUTED     = { 0.42, 0.38, 0.52, 1.0 },    -- Disabled/hint
+        TEXT_ACCENT    = { 0.70, 0.75, 0.80, 1.0 },    -- Highlighted slate
+
+        -- Borders (subtle slate)
+        BORDER_DEFAULT = { 0.28, 0.24, 0.45, 0.5 },    -- Normal borders
+        BORDER_SUBTLE  = { 0.20, 0.18, 0.35, 0.3 },    -- Very subtle
+        BORDER_FOCUS   = { 0.50, 0.55, 0.60, 0.8 },    -- Focused - slate
+        BORDER_ACCENT  = { 0.50, 0.40, 0.75, 0.6 },    -- Accent border
+
+        -- Title bar - semi-transparent for void
+        TITLEBAR_BG    = { 0.070, 0.055, 0.120, 0.2 },  -- Let void show through
+        TITLEBAR_BORDER = { 0.35, 0.38, 0.42, 0.4 },    -- Subtle slate border
+
+        -- Buttons - semi-transparent for void
+        BTN_NORMAL     = { 0.085, 0.070, 0.150, 0.6 },
+        BTN_HOVER      = { 0.120, 0.095, 0.210, 0.75 },
+        BTN_PRESSED    = { 0.150, 0.115, 0.260, 0.85 },
+        BTN_BORDER     = { 0.38, 0.30, 0.60, 0.5 },
+        BTN_BORDER_HOVER = { 0.55, 0.45, 0.85, 0.8 },
+
         -- Category list
-        CAT_NORMAL     = { 0.65, 0.68, 0.65, 1.0 },    -- Unselected text
-        CAT_SELECTED   = { 0.55, 0.85, 0.58, 1.0 },    -- Selected text
-        CAT_HOVER_BG   = { 0.15, 0.22, 0.15, 0.6 },    -- Hover background
-        CAT_SELECTED_BG = { 0.18, 0.30, 0.18, 0.8 },   -- Selected background
-        
+        CAT_NORMAL     = { 0.68, 0.64, 0.78, 1.0 },    -- Unselected text
+        CAT_SELECTED   = { 0.75, 0.78, 0.82, 1.0 },    -- Selected - bright slate
+        CAT_HOVER_BG   = { 0.10, 0.08, 0.18, 0.35 },   -- Hover - more transparent
+        CAT_SELECTED_BG = { 0.14, 0.11, 0.26, 0.5 },   -- Selected - semi-transparent
+
         -- Rows (CVar list)
-        ROW_ALT        = { 0.08, 0.09, 0.08, 0.4 },    -- Alternating row
-        ROW_HOVER      = { 0.15, 0.20, 0.15, 0.6 },    -- Row hover
+        ROW_ALT        = { 0.06, 0.05, 0.11, 0.2 },    -- Alternating row - subtle
+        ROW_HOVER      = { 0.12, 0.09, 0.22, 0.4 },    -- Row hover
+
+        -- Glow/effects
+        GLOW_PRIMARY   = { 0.45, 0.50, 0.55, 0.4 },    -- Slate glow overlay
+        GLOW_HIGHLIGHT = { 0.65, 0.55, 1.00, 0.3 },    -- Bright highlight
     },
 
     -- ==========================================
@@ -137,6 +143,24 @@ CVarMaster.Constants = {
         PADDING = 12,
         BUTTON_HEIGHT = 28,
         BORDER_SIZE = 1,
+    },
+
+    -- Custom textures
+    TEXTURES = {
+        PATH = "Interface\\AddOns\\CVarMaster\\Textures\\",
+        -- Panels
+        PANEL_BG = "Interface\\AddOns\\CVarMaster\\Textures\\panel_background",
+        SIDEBAR = "Interface\\AddOns\\CVarMaster\\Textures\\sidebar_panel",
+        TOOLTIP = "Interface\\AddOns\\CVarMaster\\Textures\\tooltip_panel",
+        HEADER_BAR = "Interface\\AddOns\\CVarMaster\\Textures\\header_bar",
+        -- Buttons
+        BTN_PRIMARY = "Interface\\AddOns\\CVarMaster\\Textures\\button_primary",
+        BTN_GHOST = "Interface\\AddOns\\CVarMaster\\Textures\\button_ghost",
+        BTN_DANGER = "Interface\\AddOns\\CVarMaster\\Textures\\button_danger",
+        -- UI Elements
+        INPUT_FIELD = "Interface\\AddOns\\CVarMaster\\Textures\\input_fields",
+        ROW = "Interface\\AddOns\\CVarMaster\\Textures\\row_elements",
+        SCROLLBAR = "Interface\\AddOns\\CVarMaster\\Textures\\scrollbar",
     },
 }
 

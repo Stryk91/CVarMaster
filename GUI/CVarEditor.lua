@@ -7,24 +7,14 @@ local Constants = CVarMaster.Constants
 -- Pool of reusable row frames
 local rowPool = {}
 local activeRows = {}
+GUI._activeRows = activeRows
+local sortedData = {}
+local BUFFER_ROWS = 4
+local scrollHookInstalled = false
 
--- Local theme helpers (with ThemeManager support)
-local function T(key)
-    if CVarMaster.ThemeManager and CVarMaster.ThemeManager.GetThemeColor then
-        return CVarMaster.ThemeManager:GetThemeColor(key)
-    end
-    if Constants and Constants.THEME and Constants.THEME[key] then
-        return unpack(Constants.THEME[key])
-    end
-    return 0.5, 0.5, 0.5, 1.0
-end
-
-local function S(key)
-    if Constants and Constants.SPACING then
-        return Constants.SPACING[key] or 8
-    end
-    return 8
-end
+-- Use shared theme/spacing helpers from Framework
+local T = GUI.GetThemeColor
+local S = GUI.GetSpacing
 
 local function GetRowHeight()
     return (Constants and Constants.GUI and Constants.GUI.ROW_HEIGHT) or 24
@@ -37,19 +27,22 @@ end
 local function CreateRow(parent, index)
     local ROW_HEIGHT = GetRowHeight()
     
-    local row = CreateFrame("Frame", nil, parent, "BackdropTemplate")
+    local row = CreateFrame("Frame", nil, parent)
     row:SetHeight(ROW_HEIGHT)
-    row:SetBackdrop({
-        bgFile = "Interface\\Buttons\\WHITE8x8",
-    })
-    
-    -- Alternating row colors (softer)
+
+    -- Background as simple texture (no BackdropTemplate - prevents opacity stacking)
+    row.bg = row:CreateTexture(nil, "BACKGROUND")
+    row.bg:SetAllPoints()
+    if GUI.DisableSharpening then GUI.DisableSharpening(row.bg) end
+
+    -- Alternating row colors (very subtle - let void show through)
     if index % 2 == 0 then
         row.normalColor = { T("ROW_ALT") }
+        row.bg:SetColorTexture(T("ROW_ALT"))
     else
         row.normalColor = { 0, 0, 0, 0 }
+        row.bg:SetColorTexture(0, 0, 0, 0)
     end
-    row:SetBackdropColor(unpack(row.normalColor))
     
     -- Hover highlight
     row:EnableMouse(true)
@@ -65,15 +58,17 @@ local function CreateRow(parent, index)
     -- CVar name (friendly name) - more prominent
     row.nameText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     row.nameText:SetPoint("LEFT", S("MD"), 0)
-    row.nameText:SetWidth(220)
+    row.nameText:SetWidth(GUI._colNameW or 180)
     row.nameText:SetJustifyH("LEFT")
+    row.nameText:SetWordWrap(false)
     row.nameText:SetTextColor(T("TEXT_PRIMARY"))
     
     -- Technical name (smaller, muted)
     row.techName = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     row.techName:SetPoint("LEFT", row.nameText, "RIGHT", S("SM"), 0)
-    row.techName:SetWidth(160)
+    row.techName:SetWidth(GUI._colTechW or 190)
     row.techName:SetJustifyH("LEFT")
+    row.techName:SetWordWrap(false)
     row.techName:SetTextColor(T("TEXT_MUTED"))
     
     -- Current value display
@@ -135,10 +130,12 @@ local function CreateRow(parent, index)
         end
     end)
     
-    -- Lock icon for persistent CVars
-    row.lockIcon = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    -- Lock icon (custom TGA)
+    row.lockIcon = row:CreateTexture(nil, "OVERLAY")
+    row.lockIcon:SetSize(14, 14)
     row.lockIcon:SetPoint("RIGHT", -S("SM") - 20, 0)
-    row.lockIcon:SetText("|cff88aaff@|r")  -- @ as lock symbol
+    row.lockIcon:SetTexture("Interface\\AddOns\\CVarMaster\\Textures\\icon_lock")
+    row.lockIcon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
     row.lockIcon:Hide()
 
     -- Warning icon for dangerous CVars
@@ -149,7 +146,7 @@ local function CreateRow(parent, index)
     
     -- Hover/Leave handlers
     row:SetScript("OnEnter", function(self)
-        self:SetBackdropColor(T("ROW_HOVER"))
+        self.bg:SetColorTexture(T("ROW_HOVER"))
         if self.cvarData then
             GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
             GameTooltip:ClearLines()
@@ -195,7 +192,7 @@ local function CreateRow(parent, index)
     end)
     
     row:SetScript("OnLeave", function(self)
-        self:SetBackdropColor(unpack(self.normalColor))
+        self.bg:SetColorTexture(unpack(self.normalColor))
         GameTooltip:Hide()
     end)
     
@@ -244,9 +241,20 @@ local function PopulateRow(row, cvarData, index)
         valueColor = Constants.COLORS.MODIFIED
         row.modifiedBar:Show()
         row.resetBtn:Show()
+        -- Subtle warm tint so modified rows stand out
+        row.normalColor = { 0.12, 0.08, 0.02, 0.25 }
+        row.bg:SetColorTexture(0.12, 0.08, 0.02, 0.25)
     else
         row.modifiedBar:Hide()
         row.resetBtn:Hide()
+        -- Restore standard alternating color
+        if index % 2 == 0 then
+            row.normalColor = { T("ROW_ALT") }
+            row.bg:SetColorTexture(T("ROW_ALT"))
+        else
+            row.normalColor = { 0, 0, 0, 0 }
+            row.bg:SetColorTexture(0, 0, 0, 0)
+        end
     end
     
     row.valueText:SetText(cvarData.value)
@@ -278,10 +286,50 @@ local function PopulateRow(row, cvarData, index)
     -- Reset edit state
     row.editBox:Hide()
     row.valueText:Show()
+
+    -- Apply current font settings to this row's text elements
+    GUI:ApplyCurrentFont(row.nameText)
+    GUI:ApplyCurrentFont(row.techName)
+    GUI:ApplyCurrentFont(row.valueText)
+    GUI:ApplyCurrentFont(row.defaultText)
     
     row:Show()
 end
 
+
+---Update only visible rows based on scroll position (virtual scrolling)
+local function UpdateVisibleRows()
+    local mainWindow = GUI:GetMainWindow()
+    if not mainWindow or not mainWindow.listContainer then return end
+
+    local content = mainWindow.listContent
+    local scrollFrame = mainWindow.listContainer.scrollFrame
+    if not content or not scrollFrame or #sortedData == 0 then return end
+
+    local ROW_HEIGHT = GetRowHeight()
+    local scrollOffset = scrollFrame:GetVerticalScroll()
+    local viewHeight = scrollFrame:GetHeight()
+
+    local firstVisible = math.max(1, math.floor(scrollOffset / ROW_HEIGHT) + 1 - BUFFER_ROWS)
+    local lastVisible = math.min(#sortedData, math.ceil((scrollOffset + viewHeight) / ROW_HEIGHT) + BUFFER_ROWS)
+
+    -- Hide rows outside visible range
+    for i, row in pairs(activeRows) do
+        if i < firstVisible or i > lastVisible then
+            row:Hide()
+            activeRows[i] = nil
+        end
+    end
+
+    -- Show/create rows in visible range
+    for i = firstVisible, lastVisible do
+        if sortedData[i] and not activeRows[i] then
+            local row = GetRow(content, i)
+            PopulateRow(row, sortedData[i], i)
+            activeRows[i] = row
+        end
+    end
+end
 ---Refresh the CVar list
 ---@param searchTerm string|nil Search term
 function GUI:RefreshCVarList(searchTerm)
@@ -316,6 +364,17 @@ function GUI:RefreshCVarList(searchTerm)
     if mainWindow.modifiedBtn and mainWindow.modifiedBtn.showModified then
         cvars = CVarMaster.CVarScanner:FilterModified(cvars)
     end
+
+    -- Filter locked only if toggled
+    if mainWindow.lockedBtn and mainWindow.lockedBtn.showLocked then
+        local filtered = {}
+        for name, data in pairs(cvars) do
+            if CVarMaster.CVarManager and CVarMaster.CVarManager:IsLocked(name) then
+                filtered[name] = data
+            end
+        end
+        cvars = filtered
+    end
     
     -- Sort by friendly name
     local sorted = {}
@@ -326,29 +385,44 @@ function GUI:RefreshCVarList(searchTerm)
         return (a.friendlyName or a.name) < (b.friendlyName or b.name)
     end)
     
+    -- Store data for virtual scrolling
+    sortedData = sorted
+
     -- Hide all existing rows
-    for _, row in pairs(activeRows) do
+    for i, row in pairs(activeRows) do
         row:Hide()
-    end
-    activeRows = {}
-    
-    -- Populate rows
-    local index = 1
-    for _, cvarData in ipairs(sorted) do
-        local row = GetRow(content, index)
-        PopulateRow(row, cvarData, index)
-        activeRows[index] = row
-        index = index + 1
+        activeRows[i] = nil
     end
     
     -- Update content height
     content:SetHeight(math.max(1, #sorted * ROW_HEIGHT))
-    
-    -- Update status
-    if mainWindow.status then
-        mainWindow.status:SetText(string.format("%d CVars", #sorted))
+
+    -- Reset scroll position so filtered results are visible from top
+    if mainWindow.listContainer and mainWindow.listContainer.scrollFrame then
+        mainWindow.listContainer.scrollFrame:SetVerticalScroll(0)
+        if mainWindow.listContainer.UpdateThumb then
+            mainWindow.listContainer.UpdateThumb()
+        end
     end
-    
+
+    -- Install scroll monitor once
+    if not scrollHookInstalled and mainWindow.listContainer then
+        local lastScroll = -1
+        mainWindow.listContainer:HookScript("OnUpdate", function()
+            local sf = mainWindow.listContainer.scrollFrame
+            if not sf then return end
+            local pos = sf:GetVerticalScroll()
+            if pos ~= lastScroll then
+                lastScroll = pos
+                UpdateVisibleRows()
+            end
+        end)
+        scrollHookInstalled = true
+    end
+
+    -- Render visible rows
+    UpdateVisibleRows()
+
     -- Update category counts
     local categoryCounts = CVarMaster.CVarScanner:GetCategoryCounts()
     GUI:UpdateCategoryCounts(categoryCounts)
@@ -360,7 +434,7 @@ local descriptionPopup = nil
 local function CreateDescriptionPopup()
     if descriptionPopup then return descriptionPopup end
 
-    local popup = CreateFrame("Frame", "CVarMasterDescPopup", UIParent, "BackdropTemplate")
+    local popup = GUI:CreateNihilumFrame("CVarMasterDescPopup", UIParent, false)
     popup:SetSize(400, 200)
     popup:SetFrameStrata("DIALOG")
     popup:SetFrameLevel(100)
@@ -371,27 +445,23 @@ local function CreateDescriptionPopup()
     popup:SetScript("OnDragStart", popup.StartMoving)
     popup:SetScript("OnDragStop", popup.StopMovingOrSizing)
 
-    -- Dark theme background
-    popup:SetBackdrop({
-        bgFile = "Interface\\Buttons\\WHITE8x8",
-        edgeFile = "Interface\\Buttons\\WHITE8x8",
-        edgeSize = 2,
-    })
-    popup:SetBackdropColor(0.08, 0.09, 0.08, 0.98)
-    popup:SetBackdropBorderColor(0.35, 0.55, 0.38, 0.8)
-
     -- Title bar
-    popup.titleBar = CreateFrame("Frame", nil, popup, "BackdropTemplate")
+    popup.titleBar = CreateFrame("Frame", nil, popup)
     popup.titleBar:SetHeight(28)
-    popup.titleBar:SetPoint("TOPLEFT", 2, -2)
-    popup.titleBar:SetPoint("TOPRIGHT", -2, -2)
-    popup.titleBar:SetBackdrop({ bgFile = "Interface\\Buttons\\WHITE8x8" })
-    popup.titleBar:SetBackdropColor(0.12, 0.16, 0.12, 1)
+    popup.titleBar:SetPoint("TOPLEFT", 4, -4)
+    popup.titleBar:SetPoint("TOPRIGHT", -4, -4)
+
+    popup.titleBar.accentLine = popup.titleBar:CreateTexture(nil, "ARTWORK")
+    popup.titleBar.accentLine:SetHeight(1)
+    popup.titleBar.accentLine:SetPoint("BOTTOMLEFT", 0, 0)
+    popup.titleBar.accentLine:SetPoint("BOTTOMRIGHT", 0, 0)
+    if GUI.RegisterAccentTexture then GUI:RegisterAccentTexture(popup.titleBar.accentLine, 0.4) end
+    if GUI.DisableSharpening then GUI.DisableSharpening(popup.titleBar.accentLine) end
 
     -- Title text (friendly name)
     popup.title = popup.titleBar:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     popup.title:SetPoint("LEFT", 10, 0)
-    popup.title:SetTextColor(0.55, 0.85, 0.58, 1)
+    popup.title:SetTextColor(T("ACCENT_HIGHLIGHT"))
 
     -- Close button
     popup.closeBtn = CreateFrame("Button", nil, popup.titleBar)
@@ -416,7 +486,7 @@ local function CreateDescriptionPopup()
     popup.sep:SetHeight(1)
     popup.sep:SetPoint("TOPLEFT", popup.techName, "BOTTOMLEFT", -5, -8)
     popup.sep:SetPoint("TOPRIGHT", popup, "TOPRIGHT", -10, 0)
-    popup.sep:SetColorTexture(0.3, 0.4, 0.32, 0.5)
+    if GUI.RegisterAccentTexture then GUI:RegisterAccentTexture(popup.sep, 0.25) end
 
     -- Description text (scrollable)
     popup.scrollFrame = CreateFrame("ScrollFrame", nil, popup, "UIPanelScrollFrameTemplate")
@@ -435,12 +505,22 @@ local function CreateDescriptionPopup()
     popup.descLabel:SetSpacing(3)
 
     -- Info section at bottom
-    popup.infoFrame = CreateFrame("Frame", nil, popup, "BackdropTemplate")
+    popup.infoFrame = CreateFrame("Frame", nil, popup)
     popup.infoFrame:SetHeight(40)
-    popup.infoFrame:SetPoint("BOTTOMLEFT", 2, 2)
-    popup.infoFrame:SetPoint("BOTTOMRIGHT", -2, 2)
-    popup.infoFrame:SetBackdrop({ bgFile = "Interface\\Buttons\\WHITE8x8" })
-    popup.infoFrame:SetBackdropColor(0.06, 0.07, 0.06, 1)
+    popup.infoFrame:SetPoint("BOTTOMLEFT", 4, 4)
+    popup.infoFrame:SetPoint("BOTTOMRIGHT", -4, 4)
+
+    popup.infoFrame.bg = popup.infoFrame:CreateTexture(nil, "BACKGROUND")
+    popup.infoFrame.bg:SetAllPoints()
+    popup.infoFrame.bg:SetColorTexture(0.04, 0.03, 0.07, 0.5)
+    if GUI.DisableSharpening then GUI.DisableSharpening(popup.infoFrame.bg) end
+
+    popup.infoFrame.topSep = popup.infoFrame:CreateTexture(nil, "ARTWORK")
+    popup.infoFrame.topSep:SetHeight(1)
+    popup.infoFrame.topSep:SetPoint("TOPLEFT", 0, 0)
+    popup.infoFrame.topSep:SetPoint("TOPRIGHT", 0, 0)
+    if GUI.RegisterAccentTexture then GUI:RegisterAccentTexture(popup.infoFrame.topSep, 0.2) end
+    if GUI.DisableSharpening then GUI.DisableSharpening(popup.infoFrame.topSep) end
 
     popup.currentLabel = popup.infoFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     popup.currentLabel:SetPoint("LEFT", 10, 6)
@@ -462,30 +542,18 @@ local function CreateDescriptionPopup()
     popup.typeLabel:SetTextColor(0.5, 0.5, 0.5)
 
     -- Lock button
-    popup.lockBtn = CreateFrame("Button", nil, popup.infoFrame, "BackdropTemplate")
-    popup.lockBtn:SetSize(70, 22)
+    popup.lockBtn = GUI:CreateButton(nil, popup.infoFrame, "Lock", 70, 22)
     popup.lockBtn:SetPoint("RIGHT", popup.typeLabel, "LEFT", -15, 0)
-    popup.lockBtn:SetBackdrop({
-        bgFile = "Interface\\Buttons\\WHITE8x8",
-        edgeFile = "Interface\\Buttons\\WHITE8x8",
-        edgeSize = 1,
-    })
-    popup.lockBtn:SetBackdropColor(0.2, 0.3, 0.4, 1)
-    popup.lockBtn:SetBackdropBorderColor(0.4, 0.5, 0.6, 1)
-
-    popup.lockBtn.text = popup.lockBtn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    popup.lockBtn.text:SetPoint("CENTER")
-    popup.lockBtn.text:SetText("Lock")
 
     popup.lockBtn:SetScript("OnEnter", function(self)
-        self:SetBackdropColor(0.3, 0.4, 0.5, 1)
+        self:SetBackdropColor(T("BTN_HOVER"))
     end)
     popup.lockBtn:SetScript("OnLeave", function(self)
         local isLocked = popup.cvarData and CVarMaster.CVarManager and CVarMaster.CVarManager:IsLocked(popup.cvarData.name)
         if isLocked then
-            self:SetBackdropColor(0.3, 0.5, 0.3, 1)
+            self:SetBackdropColor(0.18, 0.22, 0.25, 1)
         else
-            self:SetBackdropColor(0.2, 0.3, 0.4, 1)
+            self:SetBackdropColor(T("BTN_NORMAL"))
         end
     end)
     popup.lockBtn:SetScript("OnClick", function()
@@ -495,10 +563,10 @@ local function CreateDescriptionPopup()
             local isLocked = CVarMaster.CVarManager:IsLocked(popup.cvarData.name)
             if isLocked then
                 popup.lockBtn.text:SetText("Unlock")
-                popup.lockBtn:SetBackdropColor(0.3, 0.5, 0.3, 1)
+                popup.lockBtn:SetBackdropColor(0.18, 0.22, 0.25, 1)
             else
                 popup.lockBtn.text:SetText("Lock")
-                popup.lockBtn:SetBackdropColor(0.2, 0.3, 0.4, 1)
+                popup.lockBtn:SetBackdropColor(T("BTN_NORMAL"))
             end
             -- Refresh main list to update lock icons
             if GUI.RefreshCVarList then
@@ -565,15 +633,22 @@ function GUI:ShowCVarContextMenu(anchor, cvarData)
     local isLocked = CVarMaster.CVarManager and CVarMaster.CVarManager:IsLocked(cvarData.name)
     if isLocked then
         popup.lockBtn.text:SetText("Unlock")
-        popup.lockBtn:SetBackdropColor(0.3, 0.5, 0.3, 1)
+        popup.lockBtn:SetBackdropColor(0.18, 0.22, 0.25, 1)
     else
         popup.lockBtn.text:SetText("Lock")
-        popup.lockBtn:SetBackdropColor(0.2, 0.3, 0.4, 1)
+        popup.lockBtn:SetBackdropColor(T("BTN_NORMAL"))
     end
 
-    -- Position near anchor
+    -- Smart position - avoid clipping off screen edges
     popup:ClearAllPoints()
-    popup:SetPoint("TOPLEFT", anchor, "TOPRIGHT", 10, 0)
+    local screenWidth = GetScreenWidth() * UIParent:GetEffectiveScale()
+    local anchorRight = anchor:GetRight() or 0
+    if anchorRight + 420 > screenWidth then
+        -- Not enough room on the right, anchor to the left
+        popup:SetPoint("TOPRIGHT", anchor, "TOPLEFT", -10, 0)
+    else
+        popup:SetPoint("TOPLEFT", anchor, "TOPRIGHT", 10, 0)
+    end
 
     -- Show
     popup:Show()

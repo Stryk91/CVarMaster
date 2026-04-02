@@ -26,16 +26,35 @@ local function GetPrettyName(cvarName)
     return nil
 end
 
----Get category for a CVar
-local function GetCategory(cvarName)
+-- Reverse lookup table: cvarName → category (built once on first use)
+local categoryLookup = nil
+
+local function BuildCategoryLookup()
+    categoryLookup = {}
+    if CVarMaster.CVars12Lookup then
+        for cvarName in pairs(CVarMaster.CVars12Lookup) do
+            categoryLookup[cvarName] = "New in 12.0"
+        end
+    end
     if CVarMaster.CVarCategories then
         for category, cvars in pairs(CVarMaster.CVarCategories) do
             for _, name in ipairs(cvars) do
-                if name == cvarName then
-                    return category
+                -- Don't overwrite 12.0 priority
+                if not categoryLookup[name] then
+                    categoryLookup[name] = category
                 end
             end
         end
+    end
+end
+
+---Get category for a CVar
+local function GetCategory(cvarName)
+    if not categoryLookup then
+        BuildCategoryLookup()
+    end
+    if categoryLookup[cvarName] then
+        return categoryLookup[cvarName]
     end
     -- Infer from name
     local lower = cvarName:lower()
@@ -72,11 +91,23 @@ local function ScanCVar(cvarName)
     local defaultValue = GetCVarDefault(cvarName)
     local isModified = value ~= defaultValue
     
-    local dataType = "string"
-    if value == "0" or value == "1" then
-        dataType = "boolean"
-    elseif tonumber(value) then
-        dataType = "number"
+    -- Use mapping dataType if available (avoids 0/1 boolean misclassification)
+    local dataType = nil
+    if CVarMaster.CVarMappings and CVarMaster.CVarMappings[cvarName] then
+        dataType = CVarMaster.CVarMappings[cvarName].dataType
+    end
+    if not dataType then
+        -- Heuristic fallback for unknown CVars
+        local num = tonumber(value)
+        if num then
+            if num == math.floor(num) then
+                dataType = "integer"
+            else
+                dataType = "float"
+            end
+        else
+            dataType = "string"
+        end
     end
     
     return {
@@ -89,8 +120,9 @@ local function ScanCVar(cvarName)
         friendlyName = GetPrettyName(cvarName),
         description = GetDescription(cvarName),
         isCombatProtected = IsCombatProtected(cvarName),
-        isProtected = false,
-        dangerLevel = 0,
+        isProtected = CVarMaster.ProtectedCVars and CVarMaster.ProtectedCVars[cvarName] or false,
+        dangerLevel = CVarMaster.GetCVarDanger and select(1, CVarMaster.GetCVarDanger(cvarName)) or 0,
+        requiresReload = CVarMaster.RequiresReload and CVarMaster.RequiresReload(cvarName) or false,
     }
 end
 
@@ -224,29 +256,25 @@ function Scanner:Search(query)
     return results
 end
 
----Alias for Search (multi-word AND search)
+---Alias for Search with optional source table
 function Scanner:SearchCVars(query, sourceTable)
+    if not sourceTable then
+        return self:Search(query)
+    end
     local lowerQuery = query:lower()
-    local source = sourceTable or self:GetCachedCVars()
-    local results = {}
-
-    -- Split query into words (space-separated)
     local words = {}
     for word in lowerQuery:gmatch("%S+") do
         table.insert(words, word)
     end
-
-    for name, data in pairs(source) do
-        -- Build combined searchable text
+    local results = {}
+    for name, data in pairs(sourceTable) do
         local searchText = name:lower()
         if data.friendlyName then searchText = searchText .. " " .. data.friendlyName:lower() end
         if data.description then searchText = searchText .. " " .. data.description:lower() end
-
         if matchesAllWords(words, searchText) then
             results[name] = data
         end
     end
-
     return results
 end
 

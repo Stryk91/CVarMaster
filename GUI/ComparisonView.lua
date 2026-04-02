@@ -9,7 +9,8 @@ local CompareWindow = nil
 ---@param compareType string "default" or "backup"
 function GUI:ShowComparisonWindow(compareType)
     if not CompareWindow then
-        CompareWindow = GUI:CreateFrame("CVarMasterCompareWindow", UIParent, 500, 450)
+        CompareWindow = GUI:CreateNihilumFrame("CVarMasterCompareWindow", UIParent)
+        CompareWindow:SetSize(500, 450)
         CompareWindow:SetPoint("CENTER", 200, 0)
         CompareWindow:SetMovable(true)
         CompareWindow:EnableMouse(true)

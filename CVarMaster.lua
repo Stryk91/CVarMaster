@@ -1,7 +1,6 @@
 ---@class CVarMaster
 local ADDON_NAME, CVarMaster = ...
 
--- Slash commands
 SLASH_CVARMASTER1 = "/cvarmaster"
 SLASH_CVARMASTER2 = "/cvm"
 
@@ -121,7 +120,6 @@ SlashCmdList["CVARMASTER"] = function(msg)
 
     elseif cmd == "profile" or cmd == "p" then
         local subCmd = (args[2] or ""):lower()
-        -- Build profile name from remaining args (handles "Mythic Raid" with or without quotes)
         local profileName = ""
         if args[3] then
             local nameParts = {}
@@ -129,7 +127,6 @@ SlashCmdList["CVARMASTER"] = function(msg)
                 table.insert(nameParts, args[i])
             end
             profileName = table.concat(nameParts, " ")
-            -- Strip surrounding quotes if present
             profileName = profileName:match('^"?(.-)"?$') or profileName
         end
 
@@ -171,7 +168,6 @@ SlashCmdList["CVARMASTER"] = function(msg)
             elseif CVarMaster.ProfileManager then
                 local exported = CVarMaster.ProfileManager:ExportProfile(profileName)
                 if exported then
-                    -- Copy to clipboard via editbox
                     local editBox = ChatFrame1EditBox
                     if editBox then
                         editBox:SetText(exported)
@@ -215,9 +211,9 @@ SlashCmdList["CVARMASTER"] = function(msg)
             local count = 0
             print("|cff00aaffCVarMaster:|r Locked CVars (persist across sessions):")
             for name, value in pairs(locked) do
-                local data = CVarMaster.CVarScanner and CVarMaster.CVarScanner:GetCVarData(name)
-                local friendlyName = data and data.friendlyName or name
-                print("  |cff88ff88" .. friendlyName .. "|r (" .. name .. ") = |cffffff00" .. value .. "|r")
+                local current = GetCVar(name) or "?"
+                local match = (tostring(current) == tostring(value)) and "|cff00ff00OK|r" or "|cffff0000MISMATCH|r"
+                print("  |cff88ff88" .. name .. "|r = |cffffff00" .. value .. "|r (current: " .. current .. ") " .. match)
                 count = count + 1
             end
             if count == 0 then
@@ -225,6 +221,28 @@ SlashCmdList["CVARMASTER"] = function(msg)
             else
                 print("  |cff888888Total: " .. count .. " locked|r")
             end
+        end
+
+    elseif cmd == "enforce" then
+        if CVarMaster.CVarManager then
+            print("|cff00aaffCVarMaster:|r Manual enforcement...")
+            CVarMaster.CVarManager:ApplyLockedCVars()
+            if CVarMaster.CVarManager.ApplyForceCustom then
+                CVarMaster.CVarManager:ApplyForceCustom()
+            end
+        end
+
+    elseif cmd == "debug" then
+        if CVarMaster.db and CVarMaster.db.global then
+            CVarMaster.db.global.debug = not CVarMaster.db.global.debug
+            print("|cff00aaffCVarMaster:|r Debug mode " .. (CVarMaster.db.global.debug and "|cff00ff00ON|r" or "|cffff0000OFF|r"))
+        end
+
+    elseif cmd == "compare" or cmd == "diff" then
+        if CVarMaster.CVarManager then
+            CVarMaster.CVarManager:CompareToBackup()
+        else
+            print("|cffff0000CVarMaster:|r Manager not available")
         end
 
     elseif cmd == "help" then
@@ -235,49 +253,105 @@ SlashCmdList["CVARMASTER"] = function(msg)
         print("  /cvm set <name> <value> - Change CVar (safety-checked)")
         print("  /cvm reset <name|all> - Reset to default")
         print("  /cvm modified - List changed CVars")
+        print("  /cvm compare - Compare current values to last backup")
         print("  /cvm lock <name> - Lock CVar (persists across sessions)")
         print("  /cvm unlock <name> - Unlock CVar")
-        print("  /cvm locked - List all locked CVars")
+        print("  /cvm locked - List locked CVars (shows current vs locked)")
+        print("  /cvm enforce - Manually apply all locked CVars")
         print("  /cvm backup - Save current state")
         print("  /cvm restore - Restore from backup")
         print("  /cvm scan - Rescan all CVars")
-        print("  /cvm profile - Profile management (save/load/delete/list)")
+        print("  /cvm profile - Profile management")
         print("  /cvm help - Show this help")
     else
         print("|cff00aaffCVarMaster|r: /cvm or /cvm help")
     end
 end
 
--- Main initialization  
 local frame = CreateFrame("Frame")
 CVarMaster.db = nil
+local initialized = false
 
 local function Initialize()
+    if initialized then return end
+    initialized = true
+
     CVarMaster.db = CVarMasterDB or {}
     CVarMaster.db.global = CVarMaster.db.global or { debug = false }
     CVarMaster.charDB = CVarMasterCharDB or {}
     CVarMaster.charDB.mode = CVarMaster.charDB.mode or "basic"
     CVarMaster.charDB.lockedCVars = CVarMaster.charDB.lockedCVars or {}
+    CVarMaster.charDB.forceCustom = CVarMaster.charDB.forceCustom or {}
+    CVarMaster.charDB.enforceOnLogin = CVarMaster.charDB.enforceOnLogin or false
+    CVarMaster.charDB.activeProfile = CVarMaster.charDB.activeProfile or nil
 
-    -- Scan CVars silently
+    if CVarMaster.GUI and CVarMaster.GUI.LoadAccentFromDB then
+        CVarMaster.GUI:LoadAccentFromDB()
+    end
+
+    if CVarMaster.ThemeManager and CVarMaster.ThemeManager.Initialize then
+        CVarMaster.ThemeManager:Initialize()
+    end
+
     if CVarMaster.CVarScanner then
         CVarMaster.CVarScanner:ScanAll()
     end
 
-    -- Apply locked CVars
+    print("|cff00aaffCVarMaster|r v2.0.0 loaded - Type |cff00ff00/cvm|r to open")
+end
+
+local function EnforceSettings()
+    if not CVarMaster.charDB then return end
+
     if CVarMaster.CVarManager then
         CVarMaster.CVarManager:ApplyLockedCVars()
     end
 
-    print("|cff00aaffCVarMaster|r v1.1.1 loaded - Type |cff00ff00/cvm|r to open")
+    if CVarMaster.CVarManager and CVarMaster.CVarManager.ApplyForceCustom then
+        pcall(function() CVarMaster.CVarManager:ApplyForceCustom() end)
+    end
+
+    if CVarMaster.charDB.enforceOnLogin and CVarMaster.charDB.activeProfile then
+        if CVarMaster.ProfileManager and CVarMaster.ProfileManager.LoadProfile then
+            local profileName = CVarMaster.charDB.activeProfile
+            local ok = pcall(function()
+                CVarMaster.ProfileManager:LoadProfile(profileName)
+            end)
+            if ok then
+                print("|cff00aaffCVarMaster:|r Enforced profile |cffffaa00" .. profileName .. "|r")
+            end
+        end
+    end
 end
 
-frame:RegisterEvent("PLAYER_LOGIN")
+local enforcePending = false
+local enforceCount = 0
+
+local function ScheduleEnforce()
+    if enforcePending then return end
+    enforcePending = true
+    enforceCount = 0
+    C_Timer.After(1.0, function()
+        EnforceSettings()
+        enforceCount = enforceCount + 1
+    end)
+    C_Timer.After(3.0, function()
+        EnforceSettings()
+        enforceCount = enforceCount + 1
+        enforcePending = false
+    end)
+end
+
+frame:RegisterEvent("ADDON_LOADED")
+frame:RegisterEvent("PLAYER_ENTERING_WORLD")
+frame:RegisterEvent("LOADING_SCREEN_DISABLED")
 frame:RegisterEvent("PLAYER_LOGOUT")
 
-frame:SetScript("OnEvent", function(self, event)
-    if event == "PLAYER_LOGIN" then
+frame:SetScript("OnEvent", function(self, event, arg1)
+    if event == "ADDON_LOADED" and arg1 == "CVarMaster" then
         Initialize()
+    elseif event == "LOADING_SCREEN_DISABLED" or event == "PLAYER_ENTERING_WORLD" then
+        ScheduleEnforce()
     elseif event == "PLAYER_LOGOUT" then
         CVarMasterDB = CVarMaster.db
         CVarMasterCharDB = CVarMaster.charDB

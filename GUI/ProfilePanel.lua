@@ -5,72 +5,73 @@ local GUI = CVarMaster.GUI
 
 local ProfileWindow = nil
 
--- Local theme helper (with ThemeManager support)
-local function T(key)
-    if CVarMaster.ThemeManager and CVarMaster.ThemeManager.GetThemeColor then
-        return CVarMaster.ThemeManager:GetThemeColor(key)
-    end
-    if CVarMaster.Constants and CVarMaster.Constants.THEME and CVarMaster.Constants.THEME[key] then
-        return unpack(CVarMaster.Constants.THEME[key])
-    end
-    return 0.5, 0.5, 0.5, 1.0
-end
+-- Use shared theme/spacing helpers from Framework
+local T = GUI.GetThemeColor
+local S = GUI.GetSpacing
 
-local function S(key)
-    if CVarMaster.Constants and CVarMaster.Constants.SPACING then
-        return CVarMaster.Constants.SPACING[key] or 8
-    end
-    return 8
-end
+
 
 -- Custom styled row for profile list
 local function CreateProfileRow(parent, name, yOffset)
-    local row = CreateFrame("Frame", nil, parent, "BackdropTemplate")
+    local row = CreateFrame("Frame", nil, parent)
     row:SetHeight(44)
     row:SetPoint("TOPLEFT", 0, yOffset)
     row:SetPoint("TOPRIGHT", 0, yOffset)
-    row:SetBackdrop({
-        bgFile = "Interface\\Buttons\\WHITE8x8",
-        edgeFile = "Interface\\Buttons\\WHITE8x8",
-        edgeSize = 1,
-    })
-    row:SetBackdropColor(0.06, 0.06, 0.08, 0.9)
-    row:SetBackdropBorderColor(0.15, 0.15, 0.18, 1)
+
+    -- Background texture (no BackdropTemplate - let void show through)
+    row.bg = row:CreateTexture(nil, "BACKGROUND")
+    row.bg:SetAllPoints()
+    row.bg:SetColorTexture(0.06, 0.06, 0.08, 0.6)
+    GUI.DisableSharpening(row.bg)
+
+    -- Bottom separator
+    row.sep = row:CreateTexture(nil, "ARTWORK")
+    row.sep:SetHeight(1)
+    row.sep:SetPoint("BOTTOMLEFT", 0, 0)
+    row.sep:SetPoint("BOTTOMRIGHT", 0, 0)
+    row.sep:SetColorTexture(0.15, 0.15, 0.18, 0.6)
+    GUI.DisableSharpening(row.sep)
 
     -- Hover effect
     row:EnableMouse(true)
     row:SetScript("OnEnter", function(self)
-        self:SetBackdropColor(0.1, 0.12, 0.15, 1)
-        self:SetBackdropBorderColor(0, 0.5, 0.8, 0.6)
+        self.bg:SetColorTexture(0.10, 0.09, 0.16, 0.8)
+        self.sep:SetColorTexture(T("ACCENT_PRIMARY"))
+        self.sep:SetAlpha(0.4)
     end)
     row:SetScript("OnLeave", function(self)
-        self:SetBackdropColor(0.06, 0.06, 0.08, 0.9)
-        self:SetBackdropBorderColor(0.15, 0.15, 0.18, 1)
+        self.bg:SetColorTexture(0.06, 0.06, 0.08, 0.6)
+        self.sep:SetColorTexture(0.15, 0.15, 0.18, 0.6)
+        self.sep:SetAlpha(1)
     end)
 
     -- Profile icon
     local icon = row:CreateTexture(nil, "ARTWORK")
     icon:SetSize(24, 24)
     icon:SetPoint("LEFT", 10, 0)
-    icon:SetTexture("Interface\\BUTTONS\\UI-GuildButton-PublicNote-Up")
-    icon:SetVertexColor(0.4, 0.8, 1, 0.8)
+    icon:SetTexture("Interface\\AddOns\\CVarMaster\\Textures\\icon_profile")
+    icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
 
     -- Profile name
     local nameText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    nameText:SetPoint("LEFT", icon, "RIGHT", 10, 0)
+    nameText:SetPoint("LEFT", icon, "RIGHT", 8, 0)
     nameText:SetText(name)
     nameText:SetTextColor(0.85, 0.95, 0.85)
     nameText:SetWidth(140)
     nameText:SetJustifyH("LEFT")
     nameText:SetWordWrap(false)
 
+
+
+
+
     -- Action buttons container
     local btnContainer = CreateFrame("Frame", nil, row)
-    btnContainer:SetSize(180, 28)
+    btnContainer:SetSize(100, 28)
     btnContainer:SetPoint("RIGHT", -8, 0)
 
     -- Delete button (red X)
-    local deleteBtn = GUI:CreateButton(nil, btnContainer, "X", 28, 26)
+    local deleteBtn = GUI:CreateButton(nil, btnContainer, "X", 26, 24)
     deleteBtn:SetPoint("RIGHT", 0, 0)
     deleteBtn:SetBackdropBorderColor(0.6, 0.2, 0.2, 0.8)
     deleteBtn.text:SetTextColor(0.9, 0.3, 0.3)
@@ -91,7 +92,7 @@ local function CreateProfileRow(parent, name, yOffset)
     end)
 
     -- Load button (green)
-    local loadBtn = GUI:CreateButton(nil, btnContainer, "Load", 50, 26)
+    local loadBtn = GUI:CreateButton(nil, btnContainer, "Load", 44, 24)
     loadBtn:SetPoint("RIGHT", deleteBtn, "LEFT", -4, 0)
     loadBtn:SetBackdropBorderColor(0.2, 0.5, 0.2, 0.8)
     loadBtn:SetScript("OnClick", function()
@@ -102,6 +103,7 @@ local function CreateProfileRow(parent, name, yOffset)
         if GUI.RefreshCVarList then
             GUI:RefreshCVarList()
         end
+        GUI:RefreshProfileList()
     end)
     loadBtn:SetScript("OnEnter", function(self)
         self:SetBackdropColor(0.15, 0.35, 0.15, 1)
@@ -120,12 +122,31 @@ local function CreateProfileRow(parent, name, yOffset)
     end)
 
     -- Share button (blue)
-    local shareBtn = GUI:CreateButton(nil, btnContainer, "Share", 48, 26)
+    local shareBtn = GUI:CreateButton(nil, btnContainer, "Share", 44, 24)
     shareBtn:SetPoint("RIGHT", loadBtn, "LEFT", -4, 0)
     shareBtn:SetBackdropBorderColor(0.2, 0.4, 0.6, 0.8)
     shareBtn:SetScript("OnClick", function()
-        if CVarMaster.WeakAuraExport then
-            CVarMaster.WeakAuraExport:ShowEncodedExportDialog(name)
+        local exported = CVarMaster.ProfileManager:ExportProfile(name)
+        if exported then
+            -- Show simple copy dialog
+            local dialog = GUI:CreateNihilumFrame(nil, UIParent, false)
+            dialog:SetSize(400, 120)
+            dialog:SetPoint("CENTER")
+            dialog:SetFrameStrata("FULLSCREEN_DIALOG")
+            local title = dialog:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+            title:SetPoint("TOP", 0, -10)
+            title:SetText("|cff00ccffShare Profile: " .. name .. "|r")
+            local editBox = CreateFrame("EditBox", nil, dialog, "InputBoxTemplate")
+            editBox:SetSize(360, 24)
+            editBox:SetPoint("CENTER", 0, 0)
+            editBox:SetText(exported)
+            editBox:SetAutoFocus(true)
+            editBox:HighlightText()
+            editBox:SetScript("OnEscapePressed", function() dialog:Hide() end)
+            local hint = dialog:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+            hint:SetPoint("BOTTOM", 0, 10)
+            hint:SetText("|cff888888Ctrl+C to copy, Escape to close|r")
+            dialog:Show()
         end
     end)
     shareBtn:SetScript("OnEnter", function(self)
@@ -140,31 +161,6 @@ local function CreateProfileRow(parent, name, yOffset)
     shareBtn:SetScript("OnLeave", function(self)
         self:SetBackdropColor(T("BTN_NORMAL"))
         self:SetBackdropBorderColor(0.2, 0.4, 0.6, 0.8)
-        self.text:SetTextColor(T("TEXT_PRIMARY"))
-        GameTooltip:Hide()
-    end)
-
-    -- Export button (yellow)
-    local exportBtn = GUI:CreateButton(nil, btnContainer, "WA", 32, 26)
-    exportBtn:SetPoint("RIGHT", shareBtn, "LEFT", -4, 0)
-    exportBtn:SetBackdropBorderColor(0.5, 0.4, 0.2, 0.8)
-    exportBtn:SetScript("OnClick", function()
-        if CVarMaster.WeakAuraExport then
-            CVarMaster.WeakAuraExport:ShowProfileExportDialog(name)
-        end
-    end)
-    exportBtn:SetScript("OnEnter", function(self)
-        self:SetBackdropColor(0.3, 0.25, 0.1, 1)
-        self:SetBackdropBorderColor(0.7, 0.6, 0.3, 1)
-        self.text:SetTextColor(1, 0.9, 0.5)
-        GameTooltip:SetOwner(self, "ANCHOR_TOP")
-        GameTooltip:SetText("WeakAura Export", 1, 0.9, 0.5)
-        GameTooltip:AddLine("Generate init script for WeakAuras", 0.7, 0.7, 0.7)
-        GameTooltip:Show()
-    end)
-    exportBtn:SetScript("OnLeave", function(self)
-        self:SetBackdropColor(T("BTN_NORMAL"))
-        self:SetBackdropBorderColor(0.5, 0.4, 0.2, 0.8)
         self.text:SetTextColor(T("TEXT_PRIMARY"))
         GameTooltip:Hide()
     end)
@@ -190,7 +186,9 @@ StaticPopupDialogs["CVARMASTER_DELETE_PROFILE"] = {
 ---Show profile management window
 function GUI:ShowProfileWindow()
     if not ProfileWindow then
-        ProfileWindow = GUI:CreateFrame("CVarMasterProfileWindow", UIParent, 420, 480, true)
+        ProfileWindow = GUI:CreateNihilumFrame("CVarMasterProfileWindow", UIParent, true)
+        ProfileWindow:SetSize(520, 480)
+        ProfileWindow:SetClipsChildren(true)
         ProfileWindow:SetPoint("CENTER", 200, 0)
         ProfileWindow:SetMovable(true)
         ProfileWindow:EnableMouse(true)
@@ -200,29 +198,32 @@ function GUI:ShowProfileWindow()
         ProfileWindow:SetFrameStrata("DIALOG")
         ProfileWindow:SetClampedToScreen(true)
 
-        -- Title bar
-        local titleBar = CreateFrame("Frame", nil, ProfileWindow, "BackdropTemplate")
+        -- Title bar (transparent - let nine-slice show through)
+        local titleBar = CreateFrame("Frame", nil, ProfileWindow)
         titleBar:SetHeight(36)
         titleBar:SetPoint("TOPLEFT", 4, -4)
         titleBar:SetPoint("TOPRIGHT", -4, -4)
-        titleBar:SetBackdrop({
-            bgFile = "Interface\\Buttons\\WHITE8x8",
-            edgeFile = "Interface\\Buttons\\WHITE8x8",
-            edgeSize = 1,
-        })
-        titleBar:SetBackdropColor(0.08, 0.1, 0.12, 1)
-        titleBar:SetBackdropBorderColor(0.2, 0.25, 0.3, 1)
+
+        -- Subtle bottom accent line
+        titleBar.accentLine = titleBar:CreateTexture(nil, "ARTWORK")
+        titleBar.accentLine:SetHeight(1)
+        titleBar.accentLine:SetPoint("BOTTOMLEFT", 0, 0)
+        titleBar.accentLine:SetPoint("BOTTOMRIGHT", 0, 0)
+        titleBar.accentLine:SetColorTexture(T("ACCENT_PRIMARY"))
+        titleBar.accentLine:SetAlpha(0.4)
+        GUI.DisableSharpening(titleBar.accentLine)
 
         -- Title with icon
         local titleIcon = titleBar:CreateTexture(nil, "ARTWORK")
         titleIcon:SetSize(20, 20)
         titleIcon:SetPoint("LEFT", 12, 0)
-        titleIcon:SetTexture("Interface\\BUTTONS\\UI-GuildButton-PublicNote-Up")
-        titleIcon:SetVertexColor(0, 0.7, 1, 1)
+        titleIcon:SetTexture("Interface\\AddOns\\CVarMaster\\Textures\\icon_profile")
+        titleIcon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
 
         local title = titleBar:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
         title:SetPoint("LEFT", titleIcon, "RIGHT", 8, 0)
-        title:SetText("|cff5BD663Profile|r |cffE8EBE8Manager|r")
+        title:SetText("Profile Manager")
+        title:SetTextColor(0.85, 0.85, 0.90, 1)
 
         -- Close button
         local closeBtn = GUI:CreateButton(nil, titleBar, "X", 30, 30)
@@ -236,7 +237,7 @@ function GUI:ShowProfileWindow()
         ProfileWindow.subtitle = subtitle
 
         -- Profile list scroll container
-        local listContainer, listContent = GUI:CreateScrollFrame("CVarMasterProfileList", ProfileWindow, 396, 290)
+        local listContainer, listContent = GUI:CreateScrollFrame("CVarMasterProfileList", ProfileWindow, 496, 290)
         listContainer:SetPoint("TOP", 0, -68)
         ProfileWindow.listContent = listContent
         ProfileWindow.listContainer = listContainer
@@ -247,24 +248,42 @@ function GUI:ShowProfileWindow()
         divider:SetPoint("LEFT", 14, 0)
         divider:SetPoint("RIGHT", -14, 0)
         divider:SetPoint("BOTTOM", 0, 108)
-        divider:SetColorTexture(0.25, 0.3, 0.35, 0.8)
+        divider:SetColorTexture(T("ACCENT_PRIMARY"))
+        divider:SetAlpha(0.25)
+        GUI.DisableSharpening(divider)
 
         -- New profile section header
         local newHeader = ProfileWindow:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         newHeader:SetPoint("BOTTOMLEFT", 14, 82)
-        newHeader:SetText("|cff00ccffCreate New Profile|r")
+        newHeader:SetText("Create New Profile")
+        newHeader:SetTextColor(0.85, 0.85, 0.90, 1)
 
         -- Name input with styled container
-        local inputContainer = CreateFrame("Frame", nil, ProfileWindow, "BackdropTemplate")
-        inputContainer:SetSize(280, 34)
+        local inputContainer = CreateFrame("Frame", nil, ProfileWindow)
+        inputContainer:SetSize(380, 34)
         inputContainer:SetPoint("BOTTOMLEFT", 12, 44)
-        inputContainer:SetBackdrop({
-            bgFile = "Interface\\Buttons\\WHITE8x8",
-            edgeFile = "Interface\\Buttons\\WHITE8x8",
-            edgeSize = 1,
-        })
-        inputContainer:SetBackdropColor(0.05, 0.05, 0.07, 1)
-        inputContainer:SetBackdropBorderColor(0.2, 0.25, 0.3, 1)
+
+        -- Input bg (dark void with border)
+        inputContainer.bg = inputContainer:CreateTexture(nil, "BACKGROUND")
+        inputContainer.bg:SetAllPoints()
+        inputContainer.bg:SetColorTexture(0.04, 0.03, 0.07, 0.9)
+        GUI.DisableSharpening(inputContainer.bg)
+
+        -- 4-edge border
+        local function addEdge(parent, anchor1, anchor2, w, h, r, g, b, a)
+            local t = parent:CreateTexture(nil, "BORDER")
+            t:SetColorTexture(r, g, b, a)
+            if w then t:SetWidth(w) end
+            if h then t:SetHeight(h) end
+            t:SetPoint(anchor1[1], anchor1[2] or parent, anchor1[3] or anchor1[1], anchor1[4] or 0, anchor1[5] or 0)
+            if anchor2 then t:SetPoint(anchor2[1], anchor2[2] or parent, anchor2[3] or anchor2[1], anchor2[4] or 0, anchor2[5] or 0) end
+            GUI.DisableSharpening(t)
+            return t
+        end
+        inputContainer.borderTop = addEdge(inputContainer, {"TOPLEFT"}, {"TOPRIGHT"}, nil, 1, 0.20, 0.18, 0.30, 0.8)
+        inputContainer.borderBot = addEdge(inputContainer, {"BOTTOMLEFT"}, {"BOTTOMRIGHT"}, nil, 1, 0.20, 0.18, 0.30, 0.8)
+        inputContainer.borderL = addEdge(inputContainer, {"TOPLEFT"}, {"BOTTOMLEFT"}, 1, nil, 0.20, 0.18, 0.30, 0.8)
+        inputContainer.borderR = addEdge(inputContainer, {"TOPRIGHT"}, {"BOTTOMRIGHT"}, 1, nil, 0.20, 0.18, 0.30, 0.8)
 
         local nameInput = CreateFrame("EditBox", "CVarMasterNewProfile", inputContainer)
         nameInput:SetPoint("TOPLEFT", 10, -2)
@@ -286,10 +305,15 @@ function GUI:ShowProfileWindow()
 
         -- Focus effect on container
         nameInput:SetScript("OnEditFocusGained", function()
-            inputContainer:SetBackdropBorderColor(0, 0.6, 1, 0.8)
+            local ac = {T("ACCENT_PRIMARY")}
+            for _, edge in pairs({inputContainer.borderTop, inputContainer.borderBot, inputContainer.borderL, inputContainer.borderR}) do
+                edge:SetColorTexture(ac[1] or 0.5, ac[2] or 0.38, ac[3] or 0.85, 0.8)
+            end
         end)
         nameInput:SetScript("OnEditFocusLost", function()
-            inputContainer:SetBackdropBorderColor(0.2, 0.25, 0.3, 1)
+            for _, edge in pairs({inputContainer.borderTop, inputContainer.borderBot, inputContainer.borderL, inputContainer.borderR}) do
+                edge:SetColorTexture(0.20, 0.18, 0.30, 0.8)
+            end
         end)
 
         ProfileWindow.nameInput = nameInput
@@ -327,6 +351,42 @@ function GUI:ShowProfileWindow()
         -- Bottom button row
         local importBtn = GUI:CreateButton(nil, ProfileWindow, "Import", 90, 30)
         importBtn:SetPoint("BOTTOMLEFT", 12, 10)
+
+        -- Update Active button (saves to currently loaded profile) - on bottom row
+        local updateActiveBtn = GUI:CreateButton(nil, ProfileWindow, "Update Active", 100, 30)
+        updateActiveBtn:SetPoint("LEFT", importBtn, "RIGHT", 8, 0)
+        updateActiveBtn:SetBackdropBorderColor(0.4, 0.4, 0.2, 0.8)
+        updateActiveBtn:SetScript("OnClick", function()
+            local activeProfile = CVarMaster.ProfileManager and CVarMaster.ProfileManager:GetActiveProfile()
+            if activeProfile and activeProfile ~= "" then
+                CVarMaster.ProfileManager:SaveProfile(activeProfile)
+                GUI:RefreshProfileList()
+            else
+                print("|cffff0000CVarMaster:|r No active profile. Load a profile first or save a new one.")
+            end
+        end)
+        updateActiveBtn:SetScript("OnEnter", function(self)
+            local activeProfile = CVarMaster.ProfileManager and CVarMaster.ProfileManager:GetActiveProfile()
+            self:SetBackdropColor(0.25, 0.25, 0.1, 1)
+            self:SetBackdropBorderColor(0.6, 0.6, 0.3, 1)
+            self.text:SetTextColor(1, 1, 0.5)
+            GameTooltip:SetOwner(self, "ANCHOR_TOP")
+            if activeProfile then
+                GameTooltip:SetText("Update Active Profile", 1, 1, 0.5)
+                GameTooltip:AddLine("Save current CVars to: |cff00ff00" .. activeProfile .. "|r", 0.7, 0.7, 0.7)
+            else
+                GameTooltip:SetText("No Active Profile", 0.8, 0.8, 0.8)
+                GameTooltip:AddLine("Load a profile first, then use this to save changes", 0.7, 0.7, 0.7)
+            end
+            GameTooltip:Show()
+        end)
+        updateActiveBtn:SetScript("OnLeave", function(self)
+            self:SetBackdropColor(T("BTN_NORMAL"))
+            self:SetBackdropBorderColor(0.4, 0.4, 0.2, 0.8)
+            self.text:SetTextColor(T("TEXT_PRIMARY"))
+            GameTooltip:Hide()
+        end)
+        ProfileWindow.updateActiveBtn = updateActiveBtn
         importBtn:SetBackdropBorderColor(0.3, 0.3, 0.5, 0.8)
         importBtn:SetScript("OnClick", function()
             if CVarMaster.ProfileManager and CVarMaster.ProfileManager.ShowImportDialog then
@@ -345,15 +405,19 @@ function GUI:ShowProfileWindow()
             GameTooltip:Hide()
         end)
 
-        -- Help text
-        local helpText = ProfileWindow:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-        helpText:SetPoint("BOTTOM", 0, 14)
-        helpText:SetText("|cff666666Tip: Use /cvm profile <save|load|delete> <name>|r")
 
+        GUI:AddResizeHandle(ProfileWindow, 480, 400, 750, 700)
         tinsert(UISpecialFrames, "CVarMasterProfileWindow")
     end
 
     GUI:RefreshProfileList()
+
+    -- Inherit scale/alpha from main window
+    local mainWin = GUI:GetMainWindow()
+    if mainWin then
+        ProfileWindow:SetScale(mainWin:GetScale())
+    end
+    GUI:ApplySpecBackground(ProfileWindow)
     ProfileWindow:Show()
 end
 
@@ -377,12 +441,18 @@ function GUI:RefreshProfileList()
     -- Update subtitle
     if ProfileWindow.subtitle then
         local count = #profiles
+        local activeProfile = CVarMaster.ProfileManager and CVarMaster.ProfileManager:GetActiveProfile()
+        local activeText = ""
+        if activeProfile then
+            activeText = " |cff888888•|r Active: |cff00ff00" .. activeProfile .. "|r"
+        end
+
         if count == 0 then
             ProfileWindow.subtitle:SetText("|cff888888No saved profiles yet|r")
         elseif count == 1 then
-            ProfileWindow.subtitle:SetText("|cff888888" .. count .. " saved profile|r")
+            ProfileWindow.subtitle:SetText("|cff888888" .. count .. " saved profile|r" .. activeText)
         else
-            ProfileWindow.subtitle:SetText("|cff888888" .. count .. " saved profiles|r")
+            ProfileWindow.subtitle:SetText("|cff888888" .. count .. " saved profiles|r" .. activeText)
         end
     end
 
@@ -403,8 +473,9 @@ function GUI:RefreshProfileList()
         local emptyIcon = emptyFrame:CreateTexture(nil, "ARTWORK")
         emptyIcon:SetSize(48, 48)
         emptyIcon:SetPoint("CENTER", 0, 30)
-        emptyIcon:SetTexture("Interface\\BUTTONS\\UI-GuildButton-PublicNote-Up")
-        emptyIcon:SetVertexColor(0.3, 0.3, 0.3, 0.5)
+        emptyIcon:SetTexture("Interface\\AddOns\\CVarMaster\\Textures\\icon_profile")
+        emptyIcon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+        emptyIcon:SetAlpha(0.3)
 
         local emptyText = emptyFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         emptyText:SetPoint("CENTER", 0, -10)
