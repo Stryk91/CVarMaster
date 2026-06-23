@@ -28,8 +28,7 @@ local function CreateFontSection(parent)
     section.sep:SetHeight(1)
     section.sep:SetPoint("TOPLEFT", 0, 0)
     section.sep:SetPoint("TOPRIGHT", 0, 0)
-    section.sep:SetColorTexture(T("ACCENT_PRIMARY"))
-    section.sep:SetAlpha(0.25)
+    if GUI.RegisterAccentTexture then GUI:RegisterAccentTexture(section.sep, 0.25) end
     GUI.DisableSharpening(section.sep)
 
     local header = section:CreateFontString(nil, "OVERLAY", "GameFontNormal")
@@ -61,7 +60,6 @@ local function CreateFontSection(parent)
                 local s = TM():GetFontSettings()
                 return s and s.face == font.path
             end, function()
-                print("|cff00aaffCVarMaster:|r Setting font to: " .. font.name .. " (" .. font.path .. ")")
                 TM():SetFontFace(font.path)
             end, font.path)
         end
@@ -119,7 +117,6 @@ local function CreateFontSection(parent)
                 local s = TM():GetFontSettings()
                 return s and s.flags == opt.flag
             end, function()
-                print("|cff00aaffCVarMaster:|r Setting outline to: " .. opt.name)
                 TM():SetFontFlags(opt.flag)
             end, opt.flag)
         end
@@ -258,8 +255,7 @@ function GUI:ShowThemeWindow()
     titleBar.accentLine:SetHeight(1)
     titleBar.accentLine:SetPoint("BOTTOMLEFT", 0, 0)
     titleBar.accentLine:SetPoint("BOTTOMRIGHT", 0, 0)
-    titleBar.accentLine:SetColorTexture(T("ACCENT_PRIMARY"))
-    titleBar.accentLine:SetAlpha(0.4)
+    if GUI.RegisterAccentTexture then GUI:RegisterAccentTexture(titleBar.accentLine, 0.4) end
     GUI.DisableSharpening(titleBar.accentLine)
 
     local titleIcon = titleBar:CreateTexture(nil, "ARTWORK")
@@ -377,8 +373,7 @@ function GUI:ShowThemeWindow()
     divider:SetHeight(1)
     divider:SetPoint("TOPLEFT", 14, -178)
     divider:SetPoint("TOPRIGHT", -14, -178)
-    divider:SetColorTexture(T("ACCENT_PRIMARY"))
-    divider:SetAlpha(0.25)
+    if GUI.RegisterAccentTexture then GUI:RegisterAccentTexture(divider, 0.25) end
     GUI.DisableSharpening(divider)
 
     -- Font section
@@ -392,8 +387,7 @@ function GUI:ShowThemeWindow()
     bgDivider:SetHeight(1)
     bgDivider:SetPoint("TOPLEFT", fontSection, "BOTTOMLEFT", 6, -8)
     bgDivider:SetPoint("TOPRIGHT", fontSection, "BOTTOMRIGHT", -6, -8)
-    bgDivider:SetColorTexture(T("TEXT_MUTED"))
-    bgDivider:SetAlpha(0.25)
+    if GUI.RegisterAccentTexture then GUI:RegisterAccentTexture(bgDivider, 0.25) end
     if GUI.DisableSharpening then GUI.DisableSharpening(bgDivider) end
 
     local bgHeader = scrollChild:CreateFontString(nil, "OVERLAY", "GameFontNormal")

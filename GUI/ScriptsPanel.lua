@@ -176,6 +176,16 @@ local SCRIPTS = {
                 desc = "Opens the event trace debugging tool (/etrace)",
                 script = [[local ok, err = pcall(function() SlashCmdList["EVENTTRACE"]("") end); if not ok then print("|cffff8800CVarMaster:|r Event trace unavailable - try /etrace manually") end]],
             },
+            {
+                name = "All Logs OFF",
+                desc = "Disables combat/chat/taint/script + every *EventLog CVar",
+                script = [[LoggingCombat(false); LoggingChat(false); pcall(SetCVar,"taintLog","0"); pcall(SetCVar,"scriptErrors","0"); local ok,blocked=0,0; for _,c in ipairs({"BeckonTriggerEventlog","ServerMessageEventLog","CustomWindowEventLog","AIControllerEventLog","CustomDesignEventLog","AreaTriggerEventLog","debugGameEvents","WorldActionsLog","HotfixEventLog","AIEventLog","MoveHistoryEventLog","SpellScriptEventLog","UnitEnterCombatLog","ProcDebugEventLog"}) do pcall(SetCVar,c,"0"); if GetCVar(c) ~= "0" then pcall(ConsoleExec,c.." 0") end; if GetCVar(c) == "0" then ok=ok+1 else blocked=blocked+1 end end; print(string.format("|cff00aaffCVarMaster:|r Logs OFF (combat/chat/taint/script done; %d EventLog set, %d genuinely restricted)", ok, blocked))]],
+            },
+            {
+                name = "All Logs ON",
+                desc = "Enables combat/chat/taint(1)/script + every *EventLog CVar",
+                script = [[LoggingCombat(true); LoggingChat(true); pcall(SetCVar,"taintLog","1"); pcall(SetCVar,"scriptErrors","1"); local ok,blocked=0,0; for _,c in ipairs({"BeckonTriggerEventlog","ServerMessageEventLog","CustomWindowEventLog","AIControllerEventLog","CustomDesignEventLog","AreaTriggerEventLog","debugGameEvents","WorldActionsLog","HotfixEventLog","AIEventLog","MoveHistoryEventLog","SpellScriptEventLog","UnitEnterCombatLog","ProcDebugEventLog"}) do pcall(SetCVar,c,"1"); if GetCVar(c) ~= "1" then pcall(ConsoleExec,c.." 1") end; if GetCVar(c) == "1" then ok=ok+1 else blocked=blocked+1 end end; print(string.format("|cff00aaffCVarMaster:|r Logs ON (combat/chat/taint/script done; %d EventLog set, %d genuinely restricted)", ok, blocked))]],
+            },
         },
     },
     {
@@ -332,8 +342,7 @@ function GUI:ShowScriptsWindow()
     titleBar.accentLine:SetHeight(1)
     titleBar.accentLine:SetPoint("BOTTOMLEFT", 0, 0)
     titleBar.accentLine:SetPoint("BOTTOMRIGHT", 0, 0)
-    titleBar.accentLine:SetColorTexture(T("ACCENT_PRIMARY"))
-    titleBar.accentLine:SetAlpha(0.4)
+    if GUI.RegisterAccentTexture then GUI:RegisterAccentTexture(titleBar.accentLine, 0.4) end
     GUI.DisableSharpening(titleBar.accentLine)
 
     local title = titleBar:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
@@ -400,7 +409,7 @@ function GUI:ShowScriptsWindow()
         -- Header background
         local hBg = header:CreateTexture(nil, "BACKGROUND")
         hBg:SetAllPoints()
-        hBg:SetColorTexture(0.10, 0.09, 0.15, 0.7)
+        hBg:SetColorTexture(0.10, 0.10, 0.12, 0.7)
         GUI.DisableSharpening(hBg)
 
         -- Arrow indicator
@@ -438,11 +447,11 @@ function GUI:ShowScriptsWindow()
 
         -- Hover effects
         header:SetScript("OnEnter", function()
-            hBg:SetColorTexture(0.14, 0.12, 0.22, 0.8)
+            hBg:SetColorTexture(0.14, 0.14, 0.17, 0.8)
             catName:SetTextColor(T("TEXT_ACCENT"))
         end)
         header:SetScript("OnLeave", function()
-            hBg:SetColorTexture(0.10, 0.09, 0.15, 0.7)
+            hBg:SetColorTexture(0.10, 0.10, 0.12, 0.7)
             catName:SetTextColor(T("TEXT_PRIMARY"))
         end)
 
@@ -461,7 +470,7 @@ function GUI:ShowScriptsWindow()
             row.bg = row:CreateTexture(nil, "BACKGROUND")
             row.bg:SetAllPoints()
             local alt = (si % 2 == 0) and 0.04 or 0.06
-            row.bg:SetColorTexture(alt, alt - 0.01, alt + 0.04, 0.5)
+            row.bg:SetColorTexture(alt, alt, alt + 0.02, 0.5)
             GUI.DisableSharpening(row.bg)
 
             -- Script name
@@ -498,11 +507,11 @@ function GUI:ShowScriptsWindow()
 
             -- Row hover
             row:SetScript("OnEnter", function(self)
-                self.bg:SetColorTexture(0.12, 0.10, 0.18, 0.7)
+                self.bg:SetColorTexture(0.12, 0.12, 0.14, 0.7)
             end)
             row:SetScript("OnLeave", function(self)
                 local a = (si % 2 == 0) and 0.04 or 0.06
-                self.bg:SetColorTexture(a, a - 0.01, a + 0.04, 0.5)
+                self.bg:SetColorTexture(a, a, a + 0.02, 0.5)
             end)
         end
 

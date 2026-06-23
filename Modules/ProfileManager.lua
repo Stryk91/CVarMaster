@@ -69,9 +69,12 @@ function PM:LoadProfile(profileName)
 
     local count = 0
     for name, value in pairs(profile.cvars) do
-        if SetCVar(name, value) then
-            CVarMaster.CVarScanner:UpdateCVarInCache(name)
-            count = count + 1
+        local current = GetCVar(name)
+        if current ~= nil and tostring(current) ~= tostring(value) then
+            if SetCVar(name, value) then
+                CVarMaster.CVarScanner:UpdateCVarInCache(name)
+                count = count + 1
+            end
         end
     end
 

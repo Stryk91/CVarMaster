@@ -36,8 +36,8 @@ local function CreateProfileRow(parent, name, yOffset)
     row:EnableMouse(true)
     row:SetScript("OnEnter", function(self)
         self.bg:SetColorTexture(0.10, 0.09, 0.16, 0.8)
-        self.sep:SetColorTexture(T("ACCENT_PRIMARY"))
-        self.sep:SetAlpha(0.4)
+        local aR, aG, aB = GUI:GetAccentRGB()
+        self.sep:SetColorTexture(aR, aG, aB, 0.4)
     end)
     row:SetScript("OnLeave", function(self)
         self.bg:SetColorTexture(0.06, 0.06, 0.08, 0.6)
@@ -209,8 +209,7 @@ function GUI:ShowProfileWindow()
         titleBar.accentLine:SetHeight(1)
         titleBar.accentLine:SetPoint("BOTTOMLEFT", 0, 0)
         titleBar.accentLine:SetPoint("BOTTOMRIGHT", 0, 0)
-        titleBar.accentLine:SetColorTexture(T("ACCENT_PRIMARY"))
-        titleBar.accentLine:SetAlpha(0.4)
+        if GUI.RegisterAccentTexture then GUI:RegisterAccentTexture(titleBar.accentLine, 0.4) end
         GUI.DisableSharpening(titleBar.accentLine)
 
         -- Title with icon
@@ -248,8 +247,7 @@ function GUI:ShowProfileWindow()
         divider:SetPoint("LEFT", 14, 0)
         divider:SetPoint("RIGHT", -14, 0)
         divider:SetPoint("BOTTOM", 0, 108)
-        divider:SetColorTexture(T("ACCENT_PRIMARY"))
-        divider:SetAlpha(0.25)
+        if GUI.RegisterAccentTexture then GUI:RegisterAccentTexture(divider, 0.25) end
         GUI.DisableSharpening(divider)
 
         -- New profile section header

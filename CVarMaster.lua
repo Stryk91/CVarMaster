@@ -245,6 +245,28 @@ SlashCmdList["CVARMASTER"] = function(msg)
             print("|cffff0000CVarMaster:|r Manager not available")
         end
 
+    elseif cmd == "audit" then
+        if CVarMaster.CVarScanner and CVarMaster.CVarScanner.Audit then
+            CVarMaster.CVarScanner:Audit()
+        else
+            print("|cffff0000CVarMaster:|r Scanner not available")
+        end
+
+    elseif cmd == "autoenforce" then
+        local sub = (args[2] or ""):lower()
+        if not CVarMaster.charDB then
+            print("|cffff0000CVarMaster:|r charDB not initialized")
+        elseif sub == "on" or sub == "true" or sub == "1" then
+            CVarMaster.charDB.autoEnforce = true
+            print("|cff00aaffCVarMaster:|r Auto-enforce |cff00ff00ON|r. Locked CVars will reapply on login/zone.")
+        elseif sub == "off" or sub == "false" or sub == "0" then
+            CVarMaster.charDB.autoEnforce = false
+            print("|cff00aaffCVarMaster:|r Auto-enforce |cffff8800OFF|r. Use |cff00ff00/cvm enforce|r manually.")
+        else
+            local state = CVarMaster.charDB.autoEnforce and "|cff00ff00ON|r" or "|cffff8800OFF|r"
+            print("|cff00aaffCVarMaster:|r Auto-enforce is " .. state .. ". Usage: /cvm autoenforce on|off")
+        end
+
     elseif cmd == "help" then
         print("|cff00aaffCVarMaster|r Commands:")
         print("  /cvm - Open GUI")
@@ -261,6 +283,7 @@ SlashCmdList["CVARMASTER"] = function(msg)
         print("  /cvm backup - Save current state")
         print("  /cvm restore - Restore from backup")
         print("  /cvm scan - Rescan all CVars")
+        print("  /cvm audit - Diff live client CVars against KnownCVars list")
         print("  /cvm profile - Profile management")
         print("  /cvm help - Show this help")
     else
@@ -277,8 +300,19 @@ local function Initialize()
     initialized = true
 
     CVarMaster.db = CVarMasterDB or {}
+    -- Bind the saved-variables GLOBAL to our working alias immediately.
+    -- WoW serializes the global (CVarMasterDB) at logout, not CVarMaster.db.
+    -- If we leave the global nil here, the next code to touch it (ThemeManager)
+    -- creates a SEPARATE table and binds that to the global — profiles written
+    -- through CVarMaster.db then never get saved. Binding now makes them the
+    -- same table for the whole session, so divergence is impossible.
+    CVarMasterDB = CVarMaster.db
     CVarMaster.db.global = CVarMaster.db.global or { debug = false }
+    -- User-assigned category overrides keyed by CVar name.
+    -- Persists across sessions; checked first by Scanner:GetCategory.
+    CVarMaster.db.categoryOverrides = CVarMaster.db.categoryOverrides or {}
     CVarMaster.charDB = CVarMasterCharDB or {}
+    CVarMasterCharDB = CVarMaster.charDB
     CVarMaster.charDB.mode = CVarMaster.charDB.mode or "basic"
     CVarMaster.charDB.lockedCVars = CVarMaster.charDB.lockedCVars or {}
     CVarMaster.charDB.forceCustom = CVarMaster.charDB.forceCustom or {}
@@ -297,7 +331,10 @@ local function Initialize()
         CVarMaster.CVarScanner:ScanAll()
     end
 
-    print("|cff00aaffCVarMaster|r v2.0.0 loaded - Type |cff00ff00/cvm|r to open")
+    -- Deliberately silent on load. Any print() at addon-init time taints
+    -- ChatFrame1's tracked CircularBuffer, which can cascade into chat
+    -- re-emit loops in instances ("X has joined the battle" spam). Print
+    -- only on explicit user action via /cvm commands instead.
 end
 
 local function EnforceSettings()
@@ -325,19 +362,47 @@ local function EnforceSettings()
 end
 
 local enforcePending = false
-local enforceCount = 0
+local hasEnforcedThisSession = false
+local enforceDeferred = false
+local deferHintShown = false
+
+local function IsRiskyContext()
+    -- Auto-applying CVars from insecure code while CompactPartyFrame/CompactRaidFrame
+    -- or nameplates are spinning up taints those frames for the rest of the session.
+    -- Skip when we're in any instance OR have a home-category party/raid.
+    if IsInInstance and select(1, IsInInstance()) then return true end
+    if IsInGroup and IsInGroup(LE_PARTY_CATEGORY_HOME or 1) then return true end
+    return false
+end
 
 local function ScheduleEnforce()
-    if enforcePending then return end
+    if hasEnforcedThisSession or enforcePending then return end
+    if InCombatLockdown() then return end
+
+    -- DIAGNOSTIC: auto-enforce is opt-in. Default off so we can isolate
+    -- whether the locking path is the source of UI taint reports. Manual
+    -- /cvm enforce still works for testing. Flip charDB.autoEnforce = true
+    -- (or use /cvm autoenforce on) to re-enable the original behaviour.
+    -- Silent on auto-fired paths: any print() at PLAYER_ENTERING_WORLD
+    -- taints ChatFrame1 and seeds chat-redraw cascades inside instances.
+    -- Status is visible via /cvm autoenforce.
+    if not (CVarMaster.charDB and CVarMaster.charDB.autoEnforce) then
+        return
+    end
+
+    if IsRiskyContext() then
+        enforceDeferred = true
+        frame:RegisterEvent("ZONE_CHANGED_NEW_AREA")
+        frame:RegisterEvent("GROUP_ROSTER_UPDATE")
+        return
+    end
+
     enforcePending = true
-    enforceCount = 0
     C_Timer.After(1.0, function()
-        EnforceSettings()
-        enforceCount = enforceCount + 1
-    end)
-    C_Timer.After(3.0, function()
-        EnforceSettings()
-        enforceCount = enforceCount + 1
+        if not InCombatLockdown() then
+            EnforceSettings()
+            hasEnforcedThisSession = true
+        end
         enforcePending = false
     end)
 end
@@ -352,10 +417,42 @@ frame:SetScript("OnEvent", function(self, event, arg1)
         Initialize()
     elseif event == "LOADING_SCREEN_DISABLED" or event == "PLAYER_ENTERING_WORLD" then
         ScheduleEnforce()
+        if event == "PLAYER_ENTERING_WORLD" and CVarMaster.InitMicroButton then
+            C_Timer.After(1, function() CVarMaster:InitMicroButton() end)
+        end
+    elseif event == "ZONE_CHANGED_NEW_AREA" or event == "GROUP_ROSTER_UPDATE" then
+        if enforceDeferred and not hasEnforcedThisSession and not InCombatLockdown() and not IsRiskyContext() then
+            enforceDeferred = false
+            frame:UnregisterEvent("ZONE_CHANGED_NEW_AREA")
+            frame:UnregisterEvent("GROUP_ROSTER_UPDATE")
+            ScheduleEnforce()
+        end
     elseif event == "PLAYER_LOGOUT" then
         CVarMasterDB = CVarMaster.db
         CVarMasterCharDB = CVarMaster.charDB
     end
 end)
+
+function CVarMaster_OnAddonCompartmentClick(addonName, buttonName)
+    if CVarMaster.GUI then
+        local mainWin = CVarMaster.GUI:GetMainWindow()
+        if mainWin and mainWin:IsShown() then
+            CVarMaster.GUI:Hide()
+        else
+            CVarMaster.GUI:Show()
+        end
+    end
+end
+
+function CVarMaster_OnAddonCompartmentEnter(addonName, button)
+    GameTooltip:SetOwner(button, "ANCHOR_LEFT")
+    GameTooltip:SetText("CVarMaster v" .. (CVarMaster.Constants and CVarMaster.Constants.VERSION or "2.0"), 1, 1, 1)
+    GameTooltip:AddLine("Click to toggle CVar Manager", 0.6, 0.6, 0.6)
+    GameTooltip:Show()
+end
+
+function CVarMaster_OnAddonCompartmentLeave()
+    GameTooltip:Hide()
+end
 
 _G.CVarMaster = CVarMaster

@@ -23,6 +23,10 @@ CVarMaster.DangerousCVars = {
     },
 
     -- DANGEROUS - Can break functionality
+    ["ShaderCacheMode"] = {
+        level = CVarMaster.DANGER_LEVELS.DANGEROUS,
+        warning = "Setting to 0 (cacheless) forces shader recompilation every zone load. Can cause Transfer Aborted errors in arenas and dungeons.",
+    },
     ["gxRefresh"] = {
         level = CVarMaster.DANGER_LEVELS.DANGEROUS,
         warning = "Wrong refresh rate can cause display problems.",

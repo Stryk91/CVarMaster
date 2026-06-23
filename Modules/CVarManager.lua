@@ -378,17 +378,16 @@ function Manager:ApplyLockedCVars()
         local before = GetCVar(cvarName)
         if before ~= nil then
             local lockedStr = tostring(value)
-            -- Try both SetCVar and C_CVar API
-            SetCVar(cvarName, lockedStr)
-            if C_CVar and C_CVar.SetCVar then
-                C_CVar.SetCVar(cvarName, lockedStr)
+            -- ONLY call SetCVar if value actually differs (avoid re-tainting CVars)
+            if tostring(before) ~= lockedStr then
+                SetCVar(cvarName, lockedStr)
+                if debug then
+                    local after = GetCVar(cvarName)
+                    local status = (tostring(after) == lockedStr) and "|cff00ff00OK|r" or "|cffff0000FAIL|r"
+                    print("  " .. cvarName .. ": " .. tostring(before) .. " -> " .. tostring(after) .. " (want: " .. lockedStr .. ") " .. status)
+                end
+                count = count + 1
             end
-            local after = GetCVar(cvarName)
-            if debug then
-                local status = (tostring(after) == lockedStr) and "|cff00ff00OK|r" or "|cffff0000FAIL|r"
-                print("  " .. cvarName .. ": " .. tostring(before) .. " -> " .. tostring(after) .. " (want: " .. lockedStr .. ") " .. status)
-            end
-            count = count + 1
         else
             CVarMaster.charDB.lockedCVars[cvarName] = nil
             failed = failed + 1

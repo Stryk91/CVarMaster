@@ -50,6 +50,11 @@ end
 
 ---Get category for a CVar
 local function GetCategory(cvarName)
+    -- User overrides take absolute priority. Set via Scanner:SetCategoryOverride.
+    local overrides = CVarMaster.db and CVarMaster.db.categoryOverrides
+    if overrides and overrides[cvarName] then
+        return overrides[cvarName]
+    end
     if not categoryLookup then
         BuildCategoryLookup()
     end
@@ -142,10 +147,17 @@ function Scanner:ScanAll()
     end
     
     if CVarMaster.CVarMappings then
+        local userOverrides = CVarMaster.db and CVarMaster.db.categoryOverrides
         for cvarName, mapping in pairs(CVarMaster.CVarMappings) do
+            -- A user override always wins over CVarMappings.category. Without
+            -- this check, the second pass below would clobber the override
+            -- that ScanCVar -> GetCategory just resolved correctly, so user
+            -- overrides would silently revert on every ScanAll.
+            local userPickedCategory = userOverrides and userOverrides[cvarName] ~= nil
+
             if cvarCache[cvarName] then
                 -- Already cached - apply overrides from CVarMappings
-                if mapping.category then
+                if mapping.category and not userPickedCategory then
                     cvarCache[cvarName].category = mapping.category
                 end
                 if mapping.friendlyName then
@@ -156,7 +168,12 @@ function Scanner:ScanAll()
                 local data = ScanCVar(cvarName)
                 if data then
                     data.friendlyName = mapping.friendlyName or data.friendlyName
-                    data.category = mapping.category or data.category
+                    -- ScanCVar already set data.category via GetCategory, which
+                    -- consults user overrides. Only apply the mapping category
+                    -- when the user hasn't claimed this CVar.
+                    if not userPickedCategory then
+                        data.category = mapping.category or data.category
+                    end
                     cvarCache[cvarName] = data
                     count = count + 1
                 end
@@ -197,6 +214,55 @@ function Scanner:UpdateCVarInCache(cvarName)
     return data
 end
 
+---Patch the cached category field on an entry without re-scanning the CVar.
+---A full re-scan calls GetCVar/GetCVarDefault, which on certain restricted
+---CVars (e.g. event-log family) can taint when called repeatedly from
+---insecure code. Since changing category doesn't change value/type/etc.,
+---the cached entry is structurally the same — we only mutate one field.
+local function PatchCachedCategory(cvarName, newCategory)
+    local entry = cvarCache[cvarName]
+    if not entry then return end
+    entry.category = newCategory or GetCategory(cvarName)
+end
+
+---Set or clear a user category override for a CVar. Persists in
+---CVarMaster.db.categoryOverrides and is consulted first by GetCategory.
+---Pass nil/empty for newCategory to clear the override.
+---@param cvarName string
+---@param newCategory string|nil
+function Scanner:SetCategoryOverride(cvarName, newCategory)
+    if not (CVarMaster.db and cvarName) then return end
+    CVarMaster.db.categoryOverrides = CVarMaster.db.categoryOverrides or {}
+    if newCategory == nil or newCategory == "" then
+        CVarMaster.db.categoryOverrides[cvarName] = nil
+        PatchCachedCategory(cvarName, nil)  -- recompute via GetCategory inference
+    else
+        CVarMaster.db.categoryOverrides[cvarName] = newCategory
+        PatchCachedCategory(cvarName, newCategory)
+    end
+end
+
+---Bulk apply a category to many CVars in one shot. Returns count actually changed.
+---@param cvarNames table list of CVar names
+---@param newCategory string
+---@return number changed
+function Scanner:BulkSetCategoryOverride(cvarNames, newCategory)
+    if not (CVarMaster.db and newCategory and newCategory ~= "") then return 0 end
+    CVarMaster.db.categoryOverrides = CVarMaster.db.categoryOverrides or {}
+    local changed = 0
+    for _, name in ipairs(cvarNames) do
+        if CVarMaster.db.categoryOverrides[name] ~= newCategory then
+            CVarMaster.db.categoryOverrides[name] = newCategory
+            changed = changed + 1
+        end
+        -- Patch only the .category field on the cache entry. Avoids the
+        -- per-CVar GetCVar/GetCVarDefault re-scan that triggered the
+        -- taint cascade when bulk-applying to large selections.
+        PatchCachedCategory(name, newCategory)
+    end
+    return changed
+end
+
 ---Filter CVars by category name
 function Scanner:FilterByCategory(categoryName, sourceTable)
     local source = sourceTable or self:GetCachedCVars()
@@ -232,6 +298,18 @@ local function matchesAllWords(words, searchText)
 end
 
 ---Search CVars by name/description (multi-word AND search)
+---Build the searchable text for a CVar entry. Includes the name, friendly
+---name, description AND the category, so users can search by concept
+---("camera", "audio", "raid") and find anything in that category even if
+---the CVar name itself doesn't contain the word.
+local function BuildSearchText(name, data)
+    local parts = { name:lower() }
+    if data.friendlyName then parts[#parts + 1] = data.friendlyName:lower() end
+    if data.description  then parts[#parts + 1] = data.description:lower()  end
+    if data.category     then parts[#parts + 1] = data.category:lower()     end
+    return table.concat(parts, " ")
+end
+
 function Scanner:Search(query)
     local results = {}
     local lowerQuery = query:lower()
@@ -243,12 +321,7 @@ function Scanner:Search(query)
     end
 
     for name, data in pairs(self:GetCachedCVars()) do
-        -- Build combined searchable text
-        local searchText = name:lower()
-        if data.friendlyName then searchText = searchText .. " " .. data.friendlyName:lower() end
-        if data.description then searchText = searchText .. " " .. data.description:lower() end
-
-        if matchesAllWords(words, searchText) then
+        if matchesAllWords(words, BuildSearchText(name, data)) then
             results[name] = data
         end
     end
@@ -268,10 +341,7 @@ function Scanner:SearchCVars(query, sourceTable)
     end
     local results = {}
     for name, data in pairs(sourceTable) do
-        local searchText = name:lower()
-        if data.friendlyName then searchText = searchText .. " " .. data.friendlyName:lower() end
-        if data.description then searchText = searchText .. " " .. data.description:lower() end
-        if matchesAllWords(words, searchText) then
+        if matchesAllWords(words, BuildSearchText(name, data)) then
             results[name] = data
         end
     end
@@ -320,4 +390,120 @@ function Scanner:GetModifiedCount()
         if data.isModified then count = count + 1 end
     end
     return count
+end
+
+---Audit the live client's CVars against KnownCVars + CVarMappings.
+---Reports CVars that exist in the running client but aren't in our lists
+---(missing) and CVars in our lists that the client no longer has (deprecated).
+---Result is saved to CVarMasterDB.audit so it survives /reload to disk.
+---@return table missing Sorted list of live CVar names not in our data
+---@return table deprecated Sorted list of our entries that no longer exist
+function Scanner:Audit()
+    -- ConsoleGetAllCommands is a global on retail (the Console system has no
+    -- Namespace in the API docs). Older or alt clients may not have it.
+    local enumerator = _G.ConsoleGetAllCommands
+    if type(enumerator) ~= "function" then
+        print("|cffff0000CVarMaster:|r ConsoleGetAllCommands not available on this client.")
+        return {}, {}
+    end
+
+    -- Build a case-insensitive set of every CVar name we already know about,
+    -- pulling from both KnownCVars (the array list) and CVarMappings (the
+    -- friendly-name table). Values stored in the set are the original case.
+    local known = {}
+    local knownCount = 0
+    if CVarMaster.KnownCVars then
+        for _, name in ipairs(CVarMaster.KnownCVars) do
+            local key = name:lower()
+            if not known[key] then
+                known[key] = name
+                knownCount = knownCount + 1
+            end
+        end
+    end
+    if CVarMaster.CVarMappings then
+        for name in pairs(CVarMaster.CVarMappings) do
+            local key = name:lower()
+            if not known[key] then
+                known[key] = name
+                knownCount = knownCount + 1
+            end
+        end
+    end
+
+    -- Walk the live console command table.
+    -- Enum.ConsoleCommandType.Cvar = 0 in retail. Fall back to 0 if Enum
+    -- isn't populated rather than the wrong default of 1 (which is Command).
+    local cvarType = (Enum and Enum.ConsoleCommandType and Enum.ConsoleCommandType.Cvar) or 0
+    local commands = enumerator() or {}
+
+    local liveSet = {}
+    local liveCount = 0
+    local missing = {}
+    for _, cmd in ipairs(commands) do
+        local isCVar
+        if cvarType ~= nil then
+            isCVar = cmd.commandType == cvarType
+        else
+            -- Fallback if Enum isn't populated: trust the field exists and use 1.
+            isCVar = cmd.commandType == 1
+        end
+        if isCVar and cmd.command then
+            local key = cmd.command:lower()
+            if not liveSet[key] then
+                liveSet[key] = cmd.command
+                liveCount = liveCount + 1
+                if not known[key] then
+                    table.insert(missing, cmd.command)
+                end
+            end
+        end
+    end
+
+    local deprecated = {}
+    for key, originalName in pairs(known) do
+        if not liveSet[key] then
+            table.insert(deprecated, originalName)
+        end
+    end
+
+    table.sort(missing)
+    table.sort(deprecated)
+
+    -- Persist to SavedVariables so the result survives /reload and is readable
+    -- from disk for manual patching of KnownCVars.lua.
+    if CVarMaster.db then
+        CVarMaster.db.audit = {
+            timestamp = time(),
+            liveCount = liveCount,
+            knownCount = knownCount,
+            missing = missing,
+            deprecated = deprecated,
+        }
+    end
+
+    -- Summary to chat.
+    print(string.format("|cff00aaffCVarMaster Audit|r"))
+    print(string.format("  Live CVars in client:        |cff00ff00%d|r", liveCount))
+    print(string.format("  In KnownCVars + Mappings:    |cff00ff00%d|r", knownCount))
+    print(string.format("  Missing (live, not listed):  |cffff8800%d|r", #missing))
+    print(string.format("  Deprecated (listed, gone):   |cffff4040%d|r", #deprecated))
+
+    -- Show a sample of each so the user can sanity-check before reloading.
+    local function showSample(label, list, color)
+        if #list == 0 then return end
+        local sampleCount = math.min(8, #list)
+        local parts = {}
+        for i = 1, sampleCount do parts[i] = list[i] end
+        print(string.format("  %s sample: %s%s|r", label, color, table.concat(parts, ", ")))
+        if #list > sampleCount then
+            print(string.format("    %s|cff888888(+%d more)|r", string.rep(" ", 14), #list - sampleCount))
+        end
+    end
+    showSample("Missing",    missing,    "|cffffaa44")
+    showSample("Deprecated", deprecated, "|cffff8888")
+
+    print("|cff888888Saved to CVarMasterDB.audit. /reload to flush to disk.|r")
+
+    return missing, deprecated
 end

@@ -7,6 +7,7 @@ local Constants = CVarMaster.Constants
 -- Pool of reusable row frames
 local rowPool = {}
 local activeRows = {}
+local prevSortedCount = nil
 GUI._activeRows = activeRows
 local sortedData = {}
 local BUFFER_ROWS = 4
@@ -19,6 +20,37 @@ local S = GUI.GetSpacing
 local function GetRowHeight()
     return (Constants and Constants.GUI and Constants.GUI.ROW_HEIGHT) or 24
 end
+
+-- Confirmation dialog for the Change Category action. The text uses a
+-- generic "%s" placeholder so the call site can pre-format the full
+-- message (including count + target category). Avoids argument-order
+-- traps in StaticPopup_Show where mismatched %d/%s vs arg types would
+-- silently kill the popup before display.
+-- data shape: { targets = {names...}, category = "X" or nil }.
+-- A nil category clears overrides (resets to default categorization).
+StaticPopupDialogs["CVARMASTER_CONFIRM_CATEGORY"] = {
+    text = "%s",
+    button1 = YES,
+    button2 = NO,
+    OnAccept = function(self, data)
+        if not (data and data.targets) then return end
+        if data.category then
+            CVarMaster.CVarScanner:BulkSetCategoryOverride(data.targets, data.category)
+        else
+            for _, name in ipairs(data.targets) do
+                CVarMaster.CVarScanner:SetCategoryOverride(name, nil)
+            end
+        end
+        -- Clear selection after a successful batch.
+        GUI.checkedCVars = {}
+        if GUI.RefreshCVarList then GUI:RefreshCVarList() end
+        if GUI.RefreshCategoryList then GUI:RefreshCategoryList() end
+    end,
+    timeout = 0,
+    whileDead = true,
+    hideOnEscape = true,
+    preferredIndex = STATICPOPUP_NUMDIALOGS,
+}
 
 ---Create a CVar row
 ---@param parent Frame Parent frame
@@ -46,18 +78,39 @@ local function CreateRow(parent, index)
     
     -- Hover highlight
     row:EnableMouse(true)
-    
-    -- Modified indicator (left edge) - softer color
+
+    -- Selection checkbox at the very left, before the modified marker.
+    -- Toggling stores into GUI.checkedCVars (session-only set keyed by CVar
+    -- name). Used by the description popup's Change Category button to
+    -- batch-apply a category override across every checked CVar.
+    row.checkbox = CreateFrame("CheckButton", nil, row, "UICheckButtonTemplate")
+    row.checkbox:SetSize(18, 18)
+    row.checkbox:SetPoint("LEFT", row, "LEFT", 2, 0)
+    row.checkbox:SetHitRectInsets(-2, -2, -2, -2)
+    row.checkbox:SetScript("OnClick", function(self)
+        if not row.cvarData then return end
+        GUI.checkedCVars = GUI.checkedCVars or {}
+        if self:GetChecked() then
+            GUI.checkedCVars[row.cvarData.name] = true
+        else
+            GUI.checkedCVars[row.cvarData.name] = nil
+        end
+    end)
+
+    -- Modified indicator (left edge) - softer color, positioned just after
+    -- the checkbox so they read left-to-right: [check] | [name].
     row.modifiedBar = row:CreateTexture(nil, "OVERLAY")
     row.modifiedBar:SetWidth(3)
-    row.modifiedBar:SetPoint("TOPLEFT", 0, -2)
-    row.modifiedBar:SetPoint("BOTTOMLEFT", 0, 2)
+    row.modifiedBar:SetPoint("TOPLEFT", 24, -2)
+    row.modifiedBar:SetPoint("BOTTOMLEFT", 24, 2)
     row.modifiedBar:SetColorTexture(0.95, 0.75, 0.25, 1)
     row.modifiedBar:Hide()
-    
-    -- CVar name (friendly name) - more prominent
+
+    -- CVar name (friendly name) - anchored to the right of modifiedBar so
+    -- it stays put whether or not the row is modified (anchors persist
+    -- across :Hide() on the bar).
     row.nameText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    row.nameText:SetPoint("LEFT", S("MD"), 0)
+    row.nameText:SetPoint("LEFT", row.modifiedBar, "RIGHT", S("SM"), 0)
     row.nameText:SetWidth(GUI._colNameW or 180)
     row.nameText:SetJustifyH("LEFT")
     row.nameText:SetWordWrap(false)
@@ -225,12 +278,17 @@ local function PopulateRow(row, cvarData, index)
     
     row.cvarData = cvarData
     row.index = index
-    
+
     -- Position
     row:ClearAllPoints()
     row:SetPoint("TOPLEFT", 0, -((index - 1) * ROW_HEIGHT))
     row:SetPoint("TOPRIGHT", 0, -((index - 1) * ROW_HEIGHT))
-    
+
+    -- Sync checkbox state from session selection set.
+    if row.checkbox then
+        row.checkbox:SetChecked((GUI.checkedCVars and GUI.checkedCVars[cvarData.name]) and true or false)
+    end
+
     -- Name
     row.nameText:SetText(cvarData.friendlyName or cvarData.name)
     row.techName:SetText(cvarData.name)
@@ -341,6 +399,16 @@ function GUI:RefreshCVarList(searchTerm)
 
     local ROW_HEIGHT = GetRowHeight()
 
+    -- Capture scroll position so a refresh from an in-place edit (value
+    -- change, lock toggle, category override) doesn't yank the user back
+    -- to the top of the list. SetVerticalScroll auto-clamps if the new
+    -- result set is shorter, so navigation calls (search/category/filter)
+    -- still land at a sensible position.
+    local prevScroll = 0
+    if mainWindow.listContainer and mainWindow.listContainer.scrollFrame then
+        prevScroll = mainWindow.listContainer.scrollFrame:GetVerticalScroll() or 0
+    end
+
     -- Get search term from searchbox if not provided (preserves filter after edits)
     if not searchTerm and mainWindow.searchBox then
         searchTerm = mainWindow.searchBox:GetText()
@@ -349,7 +417,10 @@ function GUI:RefreshCVarList(searchTerm)
     -- Get CVars
     local cvars = CVarMaster.CVarScanner:GetCachedCVars()
 
-    -- Filter by category
+    -- Filter by category. Search is scoped to the selected category --
+    -- the "All" tab is the explicit global-scope option. This matches user
+    -- expectation: when on a specific category, typing in the search box
+    -- narrows within that category only.
     local selectedCat = GUI:GetSelectedCategory()
     if selectedCat and selectedCat ~= "All" then
         cvars = CVarMaster.CVarScanner:FilterByCategory(selectedCat, cvars)
@@ -397,9 +468,17 @@ function GUI:RefreshCVarList(searchTerm)
     -- Update content height
     content:SetHeight(math.max(1, #sorted * ROW_HEIGHT))
 
-    -- Reset scroll position so filtered results are visible from top
+    -- Preserve scroll only when the result-set size is unchanged (in-place
+    -- edits: value change, lock toggle, category override). Snap to top on
+    -- any size change (search, category switch, filter toggle) — otherwise
+    -- the prior scroll offset can land past the new content's end, leaving
+    -- the user staring at empty space below the last row. WoW's scrollframe
+    -- clamps lazily, so we don't get a free fix from SetVerticalScroll.
+    local newCount = #sorted
+    local restoredScroll = (prevSortedCount == newCount) and prevScroll or 0
+    prevSortedCount = newCount
     if mainWindow.listContainer and mainWindow.listContainer.scrollFrame then
-        mainWindow.listContainer.scrollFrame:SetVerticalScroll(0)
+        mainWindow.listContainer.scrollFrame:SetVerticalScroll(restoredScroll)
         if mainWindow.listContainer.UpdateThumb then
             mainWindow.listContainer.UpdateThumb()
         end
@@ -575,6 +654,53 @@ local function CreateDescriptionPopup()
         end
     end)
 
+    -- Change Category button. If any rows are checked, the action targets
+    -- every checked CVar (batch). Otherwise it targets the current popup's
+    -- single CVar. Opens a MenuUtil context menu listing all categories,
+    -- then a StaticPopup confirmation before applying.
+    popup.categoryBtn = GUI:CreateButton(nil, popup.infoFrame, "Change Category", 130, 22)
+    popup.categoryBtn:SetPoint("RIGHT", popup.lockBtn, "LEFT", -8, 0)
+    popup.categoryBtn:SetScript("OnEnter", function(self)
+        self:SetBackdropColor(T("BTN_HOVER"))
+    end)
+    popup.categoryBtn:SetScript("OnLeave", function(self)
+        self:SetBackdropColor(T("BTN_NORMAL"))
+    end)
+    popup.categoryBtn:SetScript("OnClick", function(self)
+        local checked = GUI.checkedCVars or {}
+        local targets = {}
+        for name in pairs(checked) do targets[#targets + 1] = name end
+        if #targets == 0 and popup.cvarData then
+            targets[1] = popup.cvarData.name
+        end
+        if #targets == 0 then return end
+
+        if not (MenuUtil and MenuUtil.CreateContextMenu) then return end
+
+        local categories = CVarMaster.CVarScanner:GetCategories()
+
+        MenuUtil.CreateContextMenu(self, function(_, root)
+            root:CreateTitle(string.format("Move %d CVar(s) to:", #targets))
+            for _, cat in ipairs(categories) do
+                root:CreateButton(cat, function()
+                    local msg = string.format("Move %d CVar(s) to category '%s'?", #targets, cat)
+                    StaticPopup_Show("CVARMASTER_CONFIRM_CATEGORY", msg, nil, {
+                        targets = targets,
+                        category = cat,
+                    })
+                end)
+            end
+            root:CreateDivider()
+            root:CreateButton("|cffff8888Reset to default|r", function()
+                local msg = string.format("Reset %d CVar(s) to default categorisation?", #targets)
+                StaticPopup_Show("CVARMASTER_CONFIRM_CATEGORY", msg, nil, {
+                    targets = targets,
+                    category = nil,
+                })
+            end)
+        end)
+    end)
+
     -- Hide on escape
     popup:SetScript("OnKeyDown", function(self, key)
         if key == "ESCAPE" then
@@ -649,6 +775,22 @@ function GUI:ShowCVarContextMenu(anchor, cvarData)
     else
         popup:SetPoint("TOPLEFT", anchor, "TOPRIGHT", 10, 0)
     end
+
+    -- Sync scale with main window
+    local mainWin = GUI:GetMainWindow()
+    if mainWin then
+        popup:SetScale(mainWin:GetScale())
+    end
+
+    -- Apply current font settings to popup text elements
+    GUI:ApplyCurrentFont(popup.title)
+    GUI:ApplyCurrentFont(popup.techName)
+    GUI:ApplyCurrentFont(popup.descLabel)
+    GUI:ApplyCurrentFont(popup.currentLabel)
+    GUI:ApplyCurrentFont(popup.currentValue)
+    GUI:ApplyCurrentFont(popup.defaultLabel)
+    GUI:ApplyCurrentFont(popup.defaultValue)
+    GUI:ApplyCurrentFont(popup.typeLabel)
 
     -- Show
     popup:Show()

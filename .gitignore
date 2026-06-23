@@ -1,0 +1,50 @@
+# ============================================================
+#  CVarMaster - .gitignore
+#  Keeps dev / local / editor junk out of the repo so it never
+#  reaches the CurseForge / Wago package that users download.
+#  (The BigWigs packager builds from the git tree, so anything
+#   ignored here is automatically absent from the released zip.)
+# ============================================================
+
+# Editor atomic-save backups:  Name.lua.tmp.<pid>.<timestamp>
+# (CLAUDE.md: ".tmp.* files are editor backup noise - don't commit.")
+*.tmp
+*.tmp.*
+*.bak
+*.swp
+*.swo
+*~
+
+# IDE / editor config
+.vscode/
+.idea/
+
+# Claude Code / AI tooling (local machine state)
+.claude/
+
+# Dev-only docs & tooling - not part of the addon.
+# Prefer to keep these versioned and only strip them from the user zip?
+# Delete these 3 lines and exclude them via .pkgmeta's ignore: list instead.
+CLAUDE.md
+_audio_scan.py
+_audio_merge.py
+Data/Roadmap
+
+# Python artifacts
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# Texture source/backups not loaded at runtime
+Textures/_blp_backup/
+
+# Packaged builds / release output / archives
+*.zip
+/.release/
+
+# OS junk
+.DS_Store
+Thumbs.db
+desktop.ini
