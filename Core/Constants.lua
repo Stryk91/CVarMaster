@@ -1,8 +1,14 @@
 ---@class CVarMaster
 local ADDON_NAME, CVarMaster = ...
 
+-- Single source of truth for the version is the TOC's "## Version:" field.
+-- Reading it back here keeps every display (main GUI title, tooltip, exported
+-- profiles) in lockstep with the TOC automatically — no second number to bump.
+local TOC_VERSION = (C_AddOns and C_AddOns.GetAddOnMetadata
+    and C_AddOns.GetAddOnMetadata(ADDON_NAME, "Version")) or "0.0.0"
+
 CVarMaster.Constants = {
-    VERSION = "2.0.0",
+    VERSION = TOC_VERSION,
 
     -- Display modes
     MODES = {

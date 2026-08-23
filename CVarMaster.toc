@@ -1,8 +1,8 @@
-## Interface: 120007
+## Interface: 120100
 ## Title: |cff00aaffCVar|r|cffffffffMaster|r
 ## Notes: The definitive CVar management and configuration tool
 ## Author: Stryker
-## Version: 2.1.0
+## Version: 2.2.0
 ## SavedVariables: CVarMasterDB
 ## SavedVariablesPerCharacter: CVarMasterCharDB
 ## AddonCompartmentFunc: CVarMaster_OnAddonCompartmentClick

@@ -30,6 +30,9 @@ _audio_scan.py
 _audio_merge.py
 Data/Roadmap
 
+# Changelog is local-only (read by wago-upload.sh from disk; never committed/published)
+CHANGELOG.md
+
 # Python artifacts
 __pycache__/
 *.pyc
