@@ -181,6 +181,17 @@ function Utils.DecodeString(str)
         return nil
     end
 
+    -- Reject truncated strings (clipped pastes) and misplaced padding — the
+    -- decode loop would otherwise substitute zero bits and return garbage
+    -- that the import parser then treats as a real profile. '=' is only valid
+    -- as a terminal run of one or two.
+    if #str % 4 ~= 0 then
+        return nil
+    end
+    if str:find("=", 1, true) and not str:match("^[A-Za-z0-9+/]+==?$") then
+        return nil
+    end
+
     -- Count padding
     local padding = 0
     if str:sub(-2) == "==" then

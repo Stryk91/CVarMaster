@@ -31,9 +31,17 @@ local categoryLookup = nil
 
 local function BuildCategoryLookup()
     categoryLookup = {}
+    if CVarMaster.CVars12_1Lookup then
+        for cvarName in pairs(CVarMaster.CVars12_1Lookup) do
+            categoryLookup[cvarName] = "New in 12.1"
+        end
+    end
     if CVarMaster.CVars12Lookup then
         for cvarName in pairs(CVarMaster.CVars12Lookup) do
-            categoryLookup[cvarName] = "New in 12.0"
+            -- 12.1 priority wins if a name somehow appears in both lists
+            if not categoryLookup[cvarName] then
+                categoryLookup[cvarName] = "New in 12.0"
+            end
         end
     end
     if CVarMaster.CVarCategories then
@@ -196,9 +204,26 @@ function Scanner:GetCachedCVars()
     return cvarCache
 end
 
+---Apply the CVarMappings category overlay to a freshly scanned entry, mirroring
+---ScanAll's second pass. Without this, any single-CVar rescan (e.g. the one
+---Manager:SetCVar triggers after every edit) silently drops the mapping
+---category and the row jumps to whatever GetCategory infers ("Other").
+---User overrides still win, same as in ScanAll.
+local function ApplyMappingOverlay(data)
+    if not data then return data end
+    local mapping = CVarMaster.CVarMappings and CVarMaster.CVarMappings[data.name]
+    if mapping and mapping.category then
+        local overrides = CVarMaster.db and CVarMaster.db.categoryOverrides
+        if not (overrides and overrides[data.name] ~= nil) then
+            data.category = mapping.category
+        end
+    end
+    return data
+end
+
 function Scanner:GetCVarData(cvarName)
     if not cvarCache[cvarName] then
-        local data = ScanCVar(cvarName)
+        local data = ApplyMappingOverlay(ScanCVar(cvarName))
         if data then
             cvarCache[cvarName] = data
         end
@@ -207,7 +232,7 @@ function Scanner:GetCVarData(cvarName)
 end
 
 function Scanner:UpdateCVarInCache(cvarName)
-    local data = ScanCVar(cvarName)
+    local data = ApplyMappingOverlay(ScanCVar(cvarName))
     if data then
         cvarCache[cvarName] = data
     end
@@ -287,10 +312,48 @@ function Scanner:FilterModified(sourceTable)
     return results
 end
 
----Helper: Check if all words are found in the searchable text
+---Search-term aliases: shorthand / synonyms a user might type that don't
+---literally appear in CVar names, descriptions or categories. Each alias
+---expands to extra substrings that are OR-matched alongside the typed word,
+---so "gfx" also surfaces graphics / gx* / render CVars. Keys MUST be lowercase.
+---Only add expansions the plain substring match can't already find (e.g.
+---"cam" needs no alias — it's a substring of "camera"), and never expand a
+---word to something SHORTER/more generic ("nameplate"->"np" matched 20+
+---unrelated CVars via showNPETutorials, UnitNameNPC, VoiceInput, ...).
+local SEARCH_ALIASES = {
+    gfx       = { "graphic", "gx", "render", "shader" },
+    gpu       = { "graphic", "gx", "render" },
+    graphics  = { "gx", "render" },
+    vfx       = { "visual", "particle", "spelleffect" },
+    sfx       = { "sound", "audio" },
+    fps       = { "performance", "lod" },
+    framerate = { "performance" },
+    aa        = { "antialias" },
+    np        = { "nameplate" },
+    ui        = { "interface" },
+    net       = { "latency" },
+}
+
+---Helper: does a single query word (or any of its aliases) appear in the text?
+local function wordMatches(word, searchText)
+    if searchText:find(word, 1, true) then
+        return true
+    end
+    local aliases = SEARCH_ALIASES[word]
+    if aliases then
+        for _, alt in ipairs(aliases) do
+            if searchText:find(alt, 1, true) then
+                return true
+            end
+        end
+    end
+    return false
+end
+
+---Helper: Check if all words (alias-expanded) are found in the searchable text
 local function matchesAllWords(words, searchText)
     for _, word in ipairs(words) do
-        if not searchText:find(word, 1, true) then
+        if not wordMatches(word, searchText) then
             return false
         end
     end

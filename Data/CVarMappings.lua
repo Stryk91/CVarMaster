@@ -95,7 +95,10 @@ CVarMaster.CVarMappings = {
         basicLabels = { "Low", "Fair", "Good", "High", "Ultra", "6", "7", "8", "9", "10" },
     },
 
-    ["renderScale"] = {
+    -- Key must match KnownCVars' spelling exactly ("RenderScale") — the scanner's
+    -- overlay pass is case-sensitive, and a differing key creates a duplicate
+    -- cache entry for the same underlying CVar.
+    ["RenderScale"] = {
         friendlyName = "Render Scale",
         description = "Resolution scaling (higher = sharper but slower)",
         category = "Graphics",

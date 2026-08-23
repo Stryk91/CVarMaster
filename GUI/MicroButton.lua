@@ -79,9 +79,17 @@ local function CreateMicroButton()
     btn:SetMovable(true)
     btn:RegisterForDrag("LeftButton")
     btn:SetScript("OnDragStart", function(self)
-        if IsShiftKeyDown() then self:StartMoving() end
+        if IsShiftKeyDown() then
+            self._moving = true
+            self:StartMoving()
+        end
     end)
+    -- OnDragStop fires for every drag gesture; only persist when a Shift-move
+    -- actually started, otherwise GetPoint() is still the CharacterMicroButton
+    -- anchor and restoring it against UIParent lands the button off-screen.
     btn:SetScript("OnDragStop", function(self)
+        if not self._moving then return end
+        self._moving = false
         self:StopMovingOrSizing()
         local point, _, relPoint, x, y = self:GetPoint()
         if CVarMaster.db and CVarMaster.db.global then

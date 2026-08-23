@@ -110,6 +110,27 @@ TM.DEFAULT_FONT_SETTINGS = {
 -- Font objects we create and manage
 TM.FontObjects = {}
 
+---SetFont with fallback: 12.0.7's font validation (RequiresValidFontAsset /
+---RequiresValidFontHeight) makes SetFont FAIL outright on a stale saved face
+---(e.g. a SharedMedia font whose addon was removed) — leaving invisible text.
+---Fall back to the bundled font so the UI always renders.
+function TM.SafeSetFont(fontObj, face, size, flags)
+    if fontObj:SetFont(face, size, flags) then
+        return true
+    end
+    return fontObj:SetFont(BUNDLED_FONT, size, flags)
+end
+
+-- Saved vars must get a COPY of the defaults: assigning DEFAULT_FONT_SETTINGS by
+-- reference lets later setters mutate (and persist) the defaults table itself.
+local function CopyFontDefaults()
+    local copy = {}
+    for k, v in pairs(TM.DEFAULT_FONT_SETTINGS) do
+        copy[k] = v
+    end
+    return copy
+end
+
 -- ==========================================
 -- INITIALIZATION
 -- ==========================================
@@ -123,14 +144,14 @@ function TM:Initialize()
     CVarMaster.db = CVarMasterDB
     if not CVarMasterDB.theme then
         CVarMasterDB.theme = {
-            font = TM.DEFAULT_FONT_SETTINGS,
+            font = CopyFontDefaults(),
         }
     end
 
 
     -- Ensure font settings exist
     if not CVarMasterDB.theme.font then
-        CVarMasterDB.theme.font = TM.DEFAULT_FONT_SETTINGS
+        CVarMasterDB.theme.font = CopyFontDefaults()
     end
 
     -- Create font objects
@@ -161,7 +182,7 @@ function TM:CreateFontObjects()
         end
 
         local size = math.floor(settings.size * sizeInfo.mult)
-        fontObj:SetFont(settings.face, size, settings.flags)
+        TM.SafeSetFont(fontObj, settings.face, size, settings.flags)
         fontObj:SetShadowOffset(settings.shadowOffsetX, settings.shadowOffsetY)
         fontObj:SetShadowColor(
             settings.shadowColorR,
@@ -188,7 +209,7 @@ function TM:UpdateFontObjects()
         local fontObj = self.FontObjects[sizeInfo.name] or _G[sizeInfo.name]
         if fontObj then
             local size = math.floor(settings.size * sizeInfo.mult)
-            fontObj:SetFont(settings.face, size, settings.flags)
+            TM.SafeSetFont(fontObj, settings.face, size, settings.flags)
             fontObj:SetShadowOffset(settings.shadowOffsetX, settings.shadowOffsetY)
             fontObj:SetShadowColor(
                 settings.shadowColorR,
@@ -302,7 +323,7 @@ end
 
 function TM:ResetFontSettings()
     if CVarMasterDB and CVarMasterDB.theme then
-        CVarMasterDB.theme.font = TM.DEFAULT_FONT_SETTINGS
+        CVarMasterDB.theme.font = CopyFontDefaults()
         self:UpdateFontObjects()
         print("|cff00aaffCVarMaster:|r Font settings reset to default")
     end
@@ -343,7 +364,7 @@ function TM:CreateFont(name, sizeMultiplier)
     local font = CreateFont(name)
 
     local size = settings.size * (sizeMultiplier or 1)
-    font:SetFont(settings.face, size, settings.flags)
+    TM.SafeSetFont(font, settings.face, size, settings.flags)
     font:SetShadowOffset(settings.shadowOffsetX, settings.shadowOffsetY)
     font:SetShadowColor(
         settings.shadowColorR,

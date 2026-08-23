@@ -394,7 +394,7 @@ function GUI:RefreshFonts(settings)
             originalFontSizes[fs] = curSize or DEFAULT_BASE_SIZE
         end
         local newSize = math.max(8, math.floor(originalFontSizes[fs] * scale + 0.5))
-        fs:SetFont(settings.face, newSize, settings.flags)
+        CVarMaster.ThemeManager.SafeSetFont(fs, settings.face, newSize, settings.flags)
         fs:SetShadowOffset(settings.shadowOffsetX, settings.shadowOffsetY)
         fs:SetShadowColor(settings.shadowColorR, settings.shadowColorG, settings.shadowColorB, settings.shadowColorA)
     end
@@ -413,7 +413,7 @@ function GUI:ApplyCurrentFont(fs)
 
     local scale = settings.size / DEFAULT_BASE_SIZE
     local newSize = math.max(8, math.floor(originalFontSizes[fs] * scale + 0.5))
-    fs:SetFont(settings.face, newSize, settings.flags)
+    CVarMaster.ThemeManager.SafeSetFont(fs, settings.face, newSize, settings.flags)
     fs:SetShadowOffset(settings.shadowOffsetX, settings.shadowOffsetY)
     fs:SetShadowColor(settings.shadowColorR, settings.shadowColorG, settings.shadowColorB, settings.shadowColorA)
 end

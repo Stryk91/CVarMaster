@@ -55,17 +55,20 @@ end
 
 ---Load profile
 ---@param profileName string Profile name
+---@param silent? boolean Suppress chat output (auto-enforce path must stay silent)
 ---@return boolean success
-function PM:LoadProfile(profileName)
+function PM:LoadProfile(profileName, silent)
     if not CVarMaster.db.profiles or not CVarMaster.db.profiles[profileName] then
-        CVarMaster.Utils.Error("Profile not found:", profileName)
+        if not silent then
+            CVarMaster.Utils.Error("Profile not found:", profileName)
+        end
         return false
     end
 
     local profile = CVarMaster.db.profiles[profileName]
 
     -- Backup current state
-    CVarMaster.CVarManager:BackupAll()
+    CVarMaster.CVarManager:BackupAll(silent)
 
     local count = 0
     for name, value in pairs(profile.cvars) do
@@ -83,7 +86,9 @@ function PM:LoadProfile(profileName)
         CVarMaster.charDB.activeProfile = profileName
     end
 
-    CVarMaster.Utils.Print("Loaded profile '" .. profileName .. "' -", count, "CVars applied")
+    if not silent then
+        CVarMaster.Utils.Print("Loaded profile '" .. profileName .. "' -", count, "CVars applied")
+    end
     return true
 end
 
@@ -133,6 +138,40 @@ function PM:GetProfiles()
     return profiles
 end
 
+-- Export-string escaping: '\' guards the structural chars '|', ';', '=' (and itself).
+-- Only these four are ever treated as escapes on import, so legacy strings with
+-- raw backslashes in values (font paths) still round-trip unchanged.
+local ESCAPABLE = { ["|"] = true, [";"] = true, ["="] = true, ["\\"] = true }
+
+local function EscapeField(s)
+    return (tostring(s):gsub("\\", "\\\\"):gsub("|", "\\|"):gsub(";", "\\;"):gsub("=", "\\="))
+end
+
+local function UnescapeField(s)
+    return (s:gsub("\\([|;=\\])", "%1"))
+end
+
+---Split on a separator, honoring backslash escapes; parts keep their escaping
+local function SplitEscaped(s, sep)
+    local parts, cur, i, n = {}, {}, 1, #s
+    while i <= n do
+        local c = s:sub(i, i)
+        if c == "\\" and ESCAPABLE[s:sub(i + 1, i + 1)] then
+            cur[#cur + 1] = s:sub(i, i + 1)
+            i = i + 2
+        elseif c == sep then
+            parts[#parts + 1] = table.concat(cur)
+            cur = {}
+            i = i + 1
+        else
+            cur[#cur + 1] = c
+            i = i + 1
+        end
+    end
+    parts[#parts + 1] = table.concat(cur)
+    return parts
+end
+
 ---Export profile to string
 ---@param profileName string Profile name
 ---@return string|nil exportString Encoded profile string
@@ -147,12 +186,10 @@ function PM:ExportProfile(profileName)
     -- Build export string: profileName|cvar1=val1;cvar2=val2;...
     local parts = {}
     for name, value in pairs(profile.cvars) do
-        -- Escape special characters
-        local escapedVal = tostring(value):gsub("|", "\\|"):gsub(";", "\\;"):gsub("=", "\\=")
-        table.insert(parts, name .. "=" .. escapedVal)
+        table.insert(parts, EscapeField(name) .. "=" .. EscapeField(value))
     end
 
-    local str = profileName .. "|" .. table.concat(parts, ";")
+    local str = EscapeField(profileName) .. "|" .. table.concat(parts, ";")
     local encoded = CVarMaster.Utils.EncodeString(str)
 
     local count = 0
@@ -184,15 +221,15 @@ function PM:ImportProfile(importString, newName)
         return false
     end
 
-    -- Parse: profileName|cvar1=val1;cvar2=val2;...
-    local pipePos = decoded:find("|")
-    if not pipePos then
+    -- Parse: profileName|cvar1=val1;cvar2=val2;... (escaped '|'/';'/'=' stay literal)
+    local headParts = SplitEscaped(decoded, "|")
+    if #headParts < 2 then
         CVarMaster.Utils.Error("Invalid import format - missing profile name")
         return false
     end
 
-    local profileName = newName or decoded:sub(1, pipePos - 1)
-    local cvarData = decoded:sub(pipePos + 1)
+    local profileName = newName or UnescapeField(headParts[1])
+    local cvarData = table.concat(headParts, "|", 2)
 
     if profileName == "" then
         CVarMaster.Utils.Error("Profile name is empty")
@@ -203,28 +240,16 @@ function PM:ImportProfile(importString, newName)
     local cvars = {}
     local count = 0
 
-    -- Split by unescaped semicolons
-    for pair in cvarData:gmatch("[^;]+") do
-        -- Find unescaped equals sign
-        local eqPos = pair:find("[^\\]=")
-        if eqPos then
-            eqPos = eqPos + 1  -- Adjust for pattern match
-        else
-            eqPos = pair:find("^=")
-            if eqPos then eqPos = 1 end
-        end
-
-        if eqPos then
-            local name = pair:sub(1, eqPos - 1)
-            local value = pair:sub(eqPos + 1)
-
-            -- Unescape special characters
-            name = name:gsub("\\|", "|"):gsub("\\;", ";"):gsub("\\=", "=")
-            value = value:gsub("\\|", "|"):gsub("\\;", ";"):gsub("\\=", "=")
-
-            if name ~= "" then
-                cvars[name] = value
-                count = count + 1
+    for _, pair in ipairs(SplitEscaped(cvarData, ";")) do
+        if pair ~= "" then
+            local eqParts = SplitEscaped(pair, "=")
+            if #eqParts >= 2 then
+                local name = UnescapeField(eqParts[1])
+                local value = UnescapeField(table.concat(eqParts, "=", 2))
+                if name ~= "" then
+                    cvars[name] = value
+                    count = count + 1
+                end
             end
         end
     end

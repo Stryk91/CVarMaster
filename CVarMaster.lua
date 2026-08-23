@@ -73,7 +73,14 @@ SlashCmdList["CVARMASTER"] = function(msg)
 
     elseif cmd == "set" then
         local cvarName = args[2]
-        local value = args[3]
+        local value
+        if args[3] then
+            local valueParts = {}
+            for i = 3, #args do
+                table.insert(valueParts, args[i])
+            end
+            value = table.concat(valueParts, " ")
+        end
         if not cvarName or cvarName == "" or not value then
             print("|cffff0000CVarMaster:|r Usage: /cvm set <cvarName> <value>")
         elseif CVarMaster.CVarManager then
@@ -206,30 +213,51 @@ SlashCmdList["CVARMASTER"] = function(msg)
         end
 
     elseif cmd == "locked" or cmd == "locks" then
-        if CVarMaster.CVarManager then
+        local sub = (args[2] or ""):lower()
+        if sub == "prune" then
+            if CVarMaster.CVarManager then
+                local pruned = CVarMaster.CVarManager:PruneStaleLocks()
+                print("|cff00aaffCVarMaster:|r Pruned " .. pruned .. " lock(s) on unregistered CVars")
+            end
+        elseif CVarMaster.CVarManager then
             local locked = CVarMaster.CVarManager:GetLockedCVars()
-            local count = 0
+            local count, stale = 0, 0
             print("|cff00aaffCVarMaster:|r Locked CVars (persist across sessions):")
             for name, value in pairs(locked) do
-                local current = GetCVar(name) or "?"
-                local match = (tostring(current) == tostring(value)) and "|cff00ff00OK|r" or "|cffff0000MISMATCH|r"
-                print("  |cff88ff88" .. name .. "|r = |cffffff00" .. value .. "|r (current: " .. current .. ") " .. match)
+                local current = GetCVar(name)
+                local status
+                if current == nil then
+                    status = "|cffff8800NOT REGISTERED|r"
+                    current = "?"
+                    stale = stale + 1
+                elseif tostring(current) == tostring(value) then
+                    status = "|cff00ff00OK|r"
+                else
+                    status = "|cffff0000MISMATCH|r"
+                end
+                print("  |cff88ff88" .. name .. "|r = |cffffff00" .. value .. "|r (current: " .. current .. ") " .. status)
                 count = count + 1
             end
             if count == 0 then
                 print("  |cff888888No locked CVars|r")
             else
                 print("  |cff888888Total: " .. count .. " locked|r")
+                if stale > 0 then
+                    print("  |cff888888" .. stale .. " not registered this session - /cvm locked prune to remove|r")
+                end
             end
         end
 
     elseif cmd == "enforce" then
         if CVarMaster.CVarManager then
             print("|cff00aaffCVarMaster:|r Manual enforcement...")
-            CVarMaster.CVarManager:ApplyLockedCVars()
+            local applied, notRegistered = CVarMaster.CVarManager:ApplyLockedCVars()
             if CVarMaster.CVarManager.ApplyForceCustom then
                 CVarMaster.CVarManager:ApplyForceCustom()
             end
+            local note = (notRegistered or 0) > 0
+                and ("  |cffff8800(" .. notRegistered .. " not registered - see /cvm locked)|r") or ""
+            print("|cff00aaffCVarMaster:|r Applied " .. (applied or 0) .. " locked CVar(s)." .. note)
         end
 
     elseif cmd == "debug" then
@@ -279,6 +307,7 @@ SlashCmdList["CVARMASTER"] = function(msg)
         print("  /cvm lock <name> - Lock CVar (persists across sessions)")
         print("  /cvm unlock <name> - Unlock CVar")
         print("  /cvm locked - List locked CVars (shows current vs locked)")
+        print("  /cvm locked prune - Remove locks on CVars gone from the client")
         print("  /cvm enforce - Manually apply all locked CVars")
         print("  /cvm backup - Save current state")
         print("  /cvm restore - Restore from backup")
@@ -341,22 +370,21 @@ local function EnforceSettings()
     if not CVarMaster.charDB then return end
 
     if CVarMaster.CVarManager then
-        CVarMaster.CVarManager:ApplyLockedCVars()
+        CVarMaster.CVarManager:ApplyLockedCVars(true)
     end
 
     if CVarMaster.CVarManager and CVarMaster.CVarManager.ApplyForceCustom then
-        pcall(function() CVarMaster.CVarManager:ApplyForceCustom() end)
+        -- silent=true: this only runs on the auto-enforce path (guard: no print()
+        -- during PLAYER_ENTERING_WORLD); /cvm enforce calls ApplyForceCustom loud.
+        pcall(function() CVarMaster.CVarManager:ApplyForceCustom(true) end)
     end
 
     if CVarMaster.charDB.enforceOnLogin and CVarMaster.charDB.activeProfile then
         if CVarMaster.ProfileManager and CVarMaster.ProfileManager.LoadProfile then
             local profileName = CVarMaster.charDB.activeProfile
-            local ok = pcall(function()
-                CVarMaster.ProfileManager:LoadProfile(profileName)
+            pcall(function()
+                CVarMaster.ProfileManager:LoadProfile(profileName, true)
             end)
-            if ok then
-                print("|cff00aaffCVarMaster:|r Enforced profile |cffffaa00" .. profileName .. "|r")
-            end
         end
     end
 end
@@ -377,7 +405,6 @@ end
 
 local function ScheduleEnforce()
     if hasEnforcedThisSession or enforcePending then return end
-    if InCombatLockdown() then return end
 
     -- DIAGNOSTIC: auto-enforce is opt-in. Default off so we can isolate
     -- whether the locking path is the source of UI taint reports. Manual
@@ -390,6 +417,13 @@ local function ScheduleEnforce()
         return
     end
 
+    if InCombatLockdown() then
+        -- Logged in while flagged in combat: retry when combat drops instead
+        -- of silently losing enforcement for the whole session.
+        frame:RegisterEvent("PLAYER_REGEN_ENABLED")
+        return
+    end
+
     if IsRiskyContext() then
         enforceDeferred = true
         frame:RegisterEvent("ZONE_CHANGED_NEW_AREA")
@@ -399,11 +433,23 @@ local function ScheduleEnforce()
 
     enforcePending = true
     C_Timer.After(1.0, function()
-        if not InCombatLockdown() then
-            EnforceSettings()
-            hasEnforcedThisSession = true
-        end
         enforcePending = false
+        if InCombatLockdown() then
+            frame:RegisterEvent("PLAYER_REGEN_ENABLED")
+            return
+        end
+        if IsRiskyContext() then
+            -- Context turned risky inside the 1s window (e.g. login-while-grouped
+            -- roster sync): defer exactly like the schedule-time guard does.
+            enforceDeferred = true
+            frame:RegisterEvent("ZONE_CHANGED_NEW_AREA")
+            frame:RegisterEvent("GROUP_ROSTER_UPDATE")
+            return
+        end
+        -- One attempt per session, even on error: an escaping Lua error here
+        -- would fire at loading-screen time and leave state wedged.
+        pcall(EnforceSettings)
+        hasEnforcedThisSession = true
     end)
 end
 
@@ -425,6 +471,11 @@ frame:SetScript("OnEvent", function(self, event, arg1)
             enforceDeferred = false
             frame:UnregisterEvent("ZONE_CHANGED_NEW_AREA")
             frame:UnregisterEvent("GROUP_ROSTER_UPDATE")
+            ScheduleEnforce()
+        end
+    elseif event == "PLAYER_REGEN_ENABLED" then
+        frame:UnregisterEvent("PLAYER_REGEN_ENABLED")
+        if not hasEnforcedThisSession then
             ScheduleEnforce()
         end
     elseif event == "PLAYER_LOGOUT" then

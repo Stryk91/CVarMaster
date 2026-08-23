@@ -101,12 +101,13 @@ CVarMaster.DangerousCVars = {
     },
 }
 
--- CVars that are protected/hidden and shouldn't be modified
+-- CVars that are protected/hidden and shouldn't be modified.
+-- Keyed set: CVarScanner looks these up by name (ScanCVar's isProtected).
 CVarMaster.ProtectedCVars = {
-    "realmList",
-    "portal",
-    "accountName",
-    "movieSubtitle",
+    ["realmList"] = true,
+    ["portal"] = true,
+    ["accountName"] = true,
+    ["movieSubtitle"] = true,
 }
 
 -- CVars that require UI reload
@@ -163,10 +164,5 @@ end
 ---@param cvarName string CVar name
 ---@return boolean protected
 function CVarMaster.IsProtected(cvarName)
-    for _, name in ipairs(CVarMaster.ProtectedCVars) do
-        if name == cvarName then
-            return true
-        end
-    end
-    return false
+    return CVarMaster.ProtectedCVars[cvarName] == true
 end

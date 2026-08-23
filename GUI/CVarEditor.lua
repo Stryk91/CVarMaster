@@ -701,15 +701,10 @@ local function CreateDescriptionPopup()
         end)
     end)
 
-    -- Hide on escape
-    popup:SetScript("OnKeyDown", function(self, key)
-        if key == "ESCAPE" then
-            self:Hide()
-            self:SetPropagateKeyboardInput(false)
-        else
-            self:SetPropagateKeyboardInput(true)
-        end
-    end)
+    -- ESC-close via UISpecialFrames (the frame has a global name). A plain
+    -- OnKeyDown handler never fires here — keyboard input is never enabled on
+    -- this frame — and SetPropagateKeyboardInput is combat-protected since 10.1.5.
+    tinsert(UISpecialFrames, "CVarMasterDescPopup")
 
     popup:Hide()
     descriptionPopup = popup

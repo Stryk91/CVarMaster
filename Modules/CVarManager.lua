@@ -18,6 +18,7 @@ local DANGEROUS_RESET_CVARS = {
     ["gxResolution"] = true,
     ["gxWindowedResolution"] = true,
     ["renderScale"] = true,
+    ["RenderScale"] = true,
     ["graphicsQuality"] = true,
 }
 
@@ -65,12 +66,14 @@ function Manager:SetCVar(cvarName, value, skipWarning)
     CVarMaster.CVarScanner:UpdateCVarInCache(cvarName)
 
     -- Warn if reload required
-    if data.requiresReload or DANGEROUS_RESET_CVARS[cvarName] then
-        print("|cff00aaffCVarMaster|r: Set |cffffaa00" .. (data.friendlyName or cvarName) .. "|r - |cffff8800/reload may be required|r")
-    else
-        print("|cff00aaffCVarMaster|r: Set |cffffaa00" .. (data.friendlyName or cvarName) .. "|r to " .. value)
+    if not skipWarning then
+        if data.requiresReload or DANGEROUS_RESET_CVARS[cvarName] then
+            print("|cff00aaffCVarMaster|r: Set |cffffaa00" .. (data.friendlyName or cvarName) .. "|r - |cffff8800/reload may be required|r")
+        else
+            print("|cff00aaffCVarMaster|r: Set |cffffaa00" .. (data.friendlyName or cvarName) .. "|r to " .. value)
+        end
     end
-    
+
     return true
 end
 
@@ -174,7 +177,8 @@ function Manager:BackupCVar(cvarName)
 end
 
 ---Backup all CVars (persists to SavedVariables)
-function Manager:BackupAll()
+---@param silent? boolean Suppress chat output (auto-enforce path must stay silent)
+function Manager:BackupAll(silent)
     local cvars = CVarMaster.CVarScanner:GetCachedCVars()
     backups.full = {}
 
@@ -187,9 +191,11 @@ function Manager:BackupAll()
         CVarMaster.db.backup = backups.full
     end
 
-    local count = 0
-    for _ in pairs(backups.full) do count = count + 1 end
-    print("|cff00aaffCVarMaster|r: Backed up " .. count .. " CVars")
+    if not silent then
+        local count = 0
+        for _ in pairs(backups.full) do count = count + 1 end
+        print("|cff00aaffCVarMaster|r: Backed up " .. count .. " CVars")
+    end
 end
 
 ---Restore from backup
@@ -206,14 +212,19 @@ function Manager:RestoreBackup(full)
         return 0
     end
 
-    local count = 0
+    local count, skipped = 0, 0
     for name, value in pairs(backup) do
-        SetCVar(name, value)
-        CVarMaster.CVarScanner:UpdateCVarInCache(name)
-        count = count + 1
+        if GetCVar(name) ~= nil then
+            SetCVar(name, value)
+            CVarMaster.CVarScanner:UpdateCVarInCache(name)
+            count = count + 1
+        else
+            skipped = skipped + 1
+        end
     end
 
-    print("|cff00aaffCVarMaster|r: Restored " .. count .. " CVars from backup")
+    local skipNote = skipped > 0 and (" (" .. skipped .. " removed CVars skipped)") or ""
+    print("|cff00aaffCVarMaster|r: Restored " .. count .. " CVars from backup" .. skipNote)
     print("|cffff8800Note:|r Some changes may require |cff00ff00/reload|r")
     return count
 end
@@ -367,12 +378,14 @@ function Manager:GetLockedCVars()
 end
 
 ---Apply all locked CVars (called after loading screen)
+---@param silent? boolean Suppress even debug output (auto-enforce path must stay silent)
 ---@return number count Number of CVars applied
-function Manager:ApplyLockedCVars()
+---@return number notRegistered Number of locks whose CVar wasn't registered yet
+function Manager:ApplyLockedCVars(silent)
     local locked = self:GetLockedCVars()
     local count = 0
-    local failed = 0
-    local debug = CVarMaster.db and CVarMaster.db.global and CVarMaster.db.global.debug
+    local notRegistered = 0
+    local debug = not silent and CVarMaster.db and CVarMaster.db.global and CVarMaster.db.global.debug
 
     for cvarName, value in pairs(locked) do
         local before = GetCVar(cvarName)
@@ -389,12 +402,28 @@ function Manager:ApplyLockedCVars()
                 count = count + 1
             end
         else
-            CVarMaster.charDB.lockedCVars[cvarName] = nil
-            failed = failed + 1
+            -- Lazily-registered CVars can still read nil this early in the session.
+            -- Keep the lock (deleting here silently destroys user data); use
+            -- /cvm locked prune for deliberate cleanup of truly removed CVars.
+            notRegistered = notRegistered + 1
         end
     end
 
-    return count
+    return count, notRegistered
+end
+
+---Remove locks whose CVars aren't registered in this session
+---@return number pruned Number of locks removed
+function Manager:PruneStaleLocks()
+    local locked = self:GetLockedCVars()
+    local pruned = 0
+    for cvarName in pairs(locked) do
+        if GetCVar(cvarName) == nil then
+            locked[cvarName] = nil
+            pruned = pruned + 1
+        end
+    end
+    return pruned
 end
 
 ---Toggle lock state for a CVar
@@ -417,7 +446,8 @@ end
 -- ============================================================================
 
 ---Apply Force Custom settings (called on PLAYER_LOGIN)
-function Manager:ApplyForceCustom()
+---@param silent? boolean Suppress chat output (auto-enforce path must stay silent)
+function Manager:ApplyForceCustom(silent)
     if not CVarMaster.charDB or not CVarMaster.charDB.forceCustom then
         return 0
     end
@@ -434,7 +464,7 @@ function Manager:ApplyForceCustom()
         end
     end
 
-    if count > 0 then
+    if count > 0 and not silent then
         print("|cff00aaffCVarMaster:|r Applied " .. count .. " Force Custom setting(s)")
     end
 
