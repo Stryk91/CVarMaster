@@ -42,7 +42,7 @@ CVarMaster.CVarCategories = {
         "ObjectSelectionCircle",
         "Outline", "OutlineEngineMode",
         "ResampleAlwaysSharpen", "ResampleQuality", "ResampleSharpness",
-        "SlugOpticalWeight", "SlugSupersampling",
+        "SlugOpticalWeight",
         "SpellVisuals",
         "UseSlug",
         "cacaoBilateralSimilarityDistanceSigma",
@@ -148,7 +148,7 @@ CVarMaster.CVarCategories = {
         "addonMapRestrictionsForced", "addonPvPMatchRestrictionsForced",
         "advJournalLastOpened",
         "allowCompareWithToggle", "alwaysCompareItems",
-        "auctionDisplayOnCharacter", "auctionHouseDurationDropdown",
+        "auctionHouseDurationDropdown",
         "autoClearAFK",
         "autoCompleteResortNamesOnRecency", "autoCompleteUseContext",
         "autoCompleteWhenEditingFromCenter",
@@ -539,7 +539,7 @@ CVarMaster.CVars12 = {
     -- Delve Tiered Entrance
     "highestUnlockedTieredEntranceTier", "lastLockedTieredEntranceCompanionAbilities", "lastSelectedTieredEntranceTier",
     -- Chat/UI 12.0
-    "addonChatRestrictionsForced", "auctionSortByBuyoutPrice", "auctionSortByUnitPrice", "chatBubblesRaid",
+    "addonChatRestrictionsForced", "chatBubblesRaid",
     "disableSuggestedLevelActivityFilter", "enableConnectToPhotoSharing", "endeavorInitiativesLastPoints",
     "imageSharingPublishCooldown", "lfgListAdvancedFiltersVersion", "majorFactionRenownMap",
     "petJournalFilterVersion", "seenPurchasableClassCapstone", "trackedInitiativeTasks",
@@ -548,6 +548,10 @@ CVarMaster.CVars12 = {
     "secretMapRestrictionsForced", "secretPvPMatchRestrictionsForced",
     "secretAurasForced", "secretCooldownsForced", "secretSpellcastsForced",
     "secretUnitComparisonForced", "secretUnitIdentityForced", "secretUnitPowerForced", "secretUnitPowerMaxForced",
+    -- Catalog gaps (12.0 Midnight CVars missed initially; surfaced by the 12.1 PTR audit, 2026-06)
+    "assistedCombatReduceHighlights",
+    "housingDecorLightRadiusIndicatorsEnabled", "housingOtherDecorLightRadiusIndicatorType",
+    "housingSelectedDecorLightRadiusIndicatorType",
 }
 -- Build lookup table for fast checking
 CVarMaster.CVars12Lookup = {}
@@ -555,9 +559,36 @@ for _, name in ipairs(CVarMaster.CVars12) do
     CVarMaster.CVars12Lookup[name] = true
 end
 
+-- 12.1 "Curse of Ula'tek" CVars (added in patch 12.1.0, build 69283 —
+-- confirmed against Ketho/BlizzardInterfaceResources live dumps 2026-08).
+CVarMaster.CVars12_1 = {
+    -- Accessibility (Screen Narrator)
+    "accessibilityScreenNarrationEnabled", "accessibilityScreenNarrationSpeechRate",
+    "accessibilityScreenNarrationSpeechVolume", "accessibilityScreenNarrationVoice",
+    "showScreenNarrationDialog",
+    -- Discord integration
+    "discordClientEnabled", "discordDisplayName",
+    -- Nameplates
+    "nameplateCheckDistanceForTarget", "nameplateForceShowUnitName", "nameplateNotSelectedAlpha",
+    "nameplatePlayRemovalAnimation", "nameplateShowAllPersonalAuras", "nameplateShowFriendlyRealmName",
+    -- Ping / Raid
+    "pingTarget", "showPingsOnRaidFrames", "raidFramesDispelIndicatorOverlayAnimation",
+    -- Tooltips / World Map
+    "tooltipShowAuraSpellIDs", "worldMapShowCursorCoords", "worldMapShowPlayerCoords",
+    -- Misc
+    "userFontScaleGlue", "taintLogObjectSecrets",
+}
+CVarMaster.CVars12_1Lookup = {}
+for _, name in ipairs(CVarMaster.CVars12_1) do
+    CVarMaster.CVars12_1Lookup[name] = true
+end
+
 -- Function to determine category from CVar name
 function CVarMaster.GetCVarCategory(cvarName)
-    -- Check 12.0 CVars first (priority category)
+    -- Check 12.1 then 12.0 CVars first (priority categories)
+    if CVarMaster.CVars12_1Lookup[cvarName] then
+        return "New in 12.1"
+    end
     if CVarMaster.CVars12Lookup[cvarName] then
         return "New in 12.0"
     end
