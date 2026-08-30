@@ -398,6 +398,7 @@ end
 local enforcePending = false
 local hasEnforcedThisSession = false
 local enforceDeferred = false
+local hasRescannedAtWorld = false
 
 local function IsRiskyContext()
     -- Auto-applying CVars from insecure code while CompactPartyFrame/CompactRaidFrame
@@ -462,6 +463,7 @@ frame:RegisterEvent("ADDON_LOADED")
 frame:RegisterEvent("PLAYER_ENTERING_WORLD")
 frame:RegisterEvent("LOADING_SCREEN_DISABLED")
 frame:RegisterEvent("PLAYER_LOGOUT")
+frame:RegisterEvent("CVAR_UPDATE")
 
 frame:SetScript("OnEvent", function(self, event, arg1)
     if event == "ADDON_LOADED" and arg1 == "CVarMaster" then
@@ -470,6 +472,21 @@ frame:SetScript("OnEvent", function(self, event, arg1)
         ScheduleEnforce()
         if event == "PLAYER_ENTERING_WORLD" and CVarMaster.InitMicroButton then
             C_Timer.After(1, function() CVarMaster:InitMicroButton() end)
+        end
+        if event == "PLAYER_ENTERING_WORLD" and not hasRescannedAtWorld then
+            -- One-shot rescan after world entry: CVars registered lazily between
+            -- ADDON_LOADED and now (load-on-demand Blizzard systems) are invisible
+            -- to the initial scan. Silent - no print() on auto paths.
+            hasRescannedAtWorld = true
+            C_Timer.After(3, function()
+                if CVarMaster.CVarScanner then
+                    CVarMaster.CVarScanner:ScanAll()
+                end
+            end)
+        end
+    elseif event == "CVAR_UPDATE" then
+        if CVarMaster.CVarScanner and CVarMaster.CVarScanner.OnCVarChanged then
+            CVarMaster.CVarScanner:OnCVarChanged(arg1)
         end
     elseif event == "ZONE_CHANGED_NEW_AREA" or event == "GROUP_ROSTER_UPDATE" then
         if enforceDeferred and not hasEnforcedThisSession and not InCombatLockdown() and not IsRiskyContext() then

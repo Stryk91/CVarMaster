@@ -239,6 +239,15 @@ function Scanner:UpdateCVarInCache(cvarName)
     return data
 end
 
+---Refresh a single cache entry when the client fires CVAR_UPDATE (Blizzard
+---Options, other addons or scripts changing values behind our back). Only
+---already-cached names are refreshed, keeping the handler cheap.
+function Scanner:OnCVarChanged(cvarName)
+    if cvarName and cvarCache[cvarName] then
+        self:UpdateCVarInCache(cvarName)
+    end
+end
+
 ---Patch the cached category field on an entry without re-scanning the CVar.
 ---A full re-scan calls GetCVar/GetCVarDefault, which on certain restricted
 ---CVars (e.g. event-log family) can taint when called repeatedly from

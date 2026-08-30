@@ -50,12 +50,13 @@ local function ShowShareDialog(profileName, exported)
     shareDialog.editBox:HighlightText()
 end
 
--- Custom styled row for profile list
-local function CreateProfileRow(parent, name, yOffset)
+-- Custom styled row for profile list. Rows are pooled by RefreshProfileList
+-- (WoW never GC's frames, so rebuild-per-refresh leaks ~40 UI objects per
+-- profile per refresh): handlers read row.profileName instead of capturing a
+-- name, so a row can be retargeted without rebuilding.
+local function CreateProfileRow(parent)
     local row = CreateFrame("Frame", nil, parent)
     row:SetHeight(44)
-    row:SetPoint("TOPLEFT", 0, yOffset)
-    row:SetPoint("TOPRIGHT", 0, yOffset)
 
     -- Background texture (no BackdropTemplate - let void show through)
     row.bg = row:CreateTexture(nil, "BACKGROUND")
@@ -92,13 +93,12 @@ local function CreateProfileRow(parent, name, yOffset)
     icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
 
     -- Profile name
-    local nameText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    nameText:SetPoint("LEFT", icon, "RIGHT", 8, 0)
-    nameText:SetText(name)
-    nameText:SetTextColor(0.85, 0.95, 0.85)
-    nameText:SetWidth(140)
-    nameText:SetJustifyH("LEFT")
-    nameText:SetWordWrap(false)
+    row.nameText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    row.nameText:SetPoint("LEFT", icon, "RIGHT", 8, 0)
+    row.nameText:SetTextColor(0.85, 0.95, 0.85)
+    row.nameText:SetWidth(140)
+    row.nameText:SetJustifyH("LEFT")
+    row.nameText:SetWordWrap(false)
 
 
 
@@ -115,7 +115,7 @@ local function CreateProfileRow(parent, name, yOffset)
     deleteBtn:SetBackdropBorderColor(0.6, 0.2, 0.2, 0.8)
     deleteBtn.text:SetTextColor(0.9, 0.3, 0.3)
     deleteBtn:SetScript("OnClick", function()
-        StaticPopup_Show("CVARMASTER_DELETE_PROFILE", name, nil, { profileName = name })
+        StaticPopup_Show("CVARMASTER_DELETE_PROFILE", row.profileName, nil, { profileName = row.profileName })
     end)
     deleteBtn:SetScript("OnEnter", function(self)
         self:SetBackdropColor(0.4, 0.1, 0.1, 1)
@@ -135,7 +135,7 @@ local function CreateProfileRow(parent, name, yOffset)
     loadBtn:SetPoint("RIGHT", deleteBtn, "LEFT", -4, 0)
     loadBtn:SetBackdropBorderColor(0.2, 0.5, 0.2, 0.8)
     loadBtn:SetScript("OnClick", function()
-        CVarMaster.ProfileManager:LoadProfile(name)
+        CVarMaster.ProfileManager:LoadProfile(row.profileName)
         if CVarMaster.CVarScanner then
             CVarMaster.CVarScanner:RefreshCache()
         end
@@ -165,9 +165,9 @@ local function CreateProfileRow(parent, name, yOffset)
     shareBtn:SetPoint("RIGHT", loadBtn, "LEFT", -4, 0)
     shareBtn:SetBackdropBorderColor(0.2, 0.4, 0.6, 0.8)
     shareBtn:SetScript("OnClick", function()
-        local exported = CVarMaster.ProfileManager:ExportProfile(name)
+        local exported = CVarMaster.ProfileManager:ExportProfile(row.profileName)
         if exported then
-            ShowShareDialog(name, exported)
+            ShowShareDialog(row.profileName, exported)
         end
     end)
     shareBtn:SetScript("OnEnter", function(self)
@@ -185,6 +185,11 @@ local function CreateProfileRow(parent, name, yOffset)
         self.text:SetTextColor(T("TEXT_PRIMARY"))
         GameTooltip:Hide()
     end)
+
+    function row:SetProfile(profileName)
+        self.profileName = profileName
+        self.nameText:SetText(profileName)
+    end
 
     return row
 end
@@ -445,12 +450,8 @@ function GUI:RefreshProfileList()
     if not ProfileWindow or not ProfileWindow.listContent then return end
 
     local content = ProfileWindow.listContent
-
-    -- Clear existing
-    for _, child in pairs({content:GetChildren()}) do
-        child:Hide()
-        child:SetParent(nil)
-    end
+    ProfileWindow.rows = ProfileWindow.rows or {}
+    local rows = ProfileWindow.rows
 
     local profiles = CVarMaster.ProfileManager:GetProfiles()
 
@@ -477,15 +478,29 @@ function GUI:RefreshProfileList()
 
     local yOffset = 0
 
-    for _, name in ipairs(profiles) do
-        local row = CreateProfileRow(content, name, yOffset)
+    for i, name in ipairs(profiles) do
+        local row = rows[i]
+        if not row then
+            row = CreateProfileRow(content)
+            rows[i] = row
+        end
+        row:SetProfile(name)
+        row:ClearAllPoints()
+        row:SetPoint("TOPLEFT", 0, yOffset)
+        row:SetPoint("TOPRIGHT", 0, yOffset)
+        row:Show()
         yOffset = yOffset - 48
+    end
+
+    -- Hide pooled rows beyond this refresh's count
+    for i = #profiles + 1, #rows do
+        rows[i]:Hide()
     end
 
     content:SetHeight(math.max(1, math.abs(yOffset)))
 
-    -- Empty state
-    if #profiles == 0 then
+    -- Empty state (created once, toggled)
+    if not ProfileWindow.emptyFrame then
         local emptyFrame = CreateFrame("Frame", nil, content)
         emptyFrame:SetAllPoints()
 
@@ -503,7 +518,10 @@ function GUI:RefreshProfileList()
         local emptyHint = emptyFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         emptyHint:SetPoint("CENTER", 0, -30)
         emptyHint:SetText("|cff444444Enter a name below and click Save|r")
+
+        ProfileWindow.emptyFrame = emptyFrame
     end
+    ProfileWindow.emptyFrame:SetShown(#profiles == 0)
 end
 
 CVarMaster.Utils.Debug("ProfilePanel module loaded")

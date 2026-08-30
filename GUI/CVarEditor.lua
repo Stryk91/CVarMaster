@@ -760,21 +760,28 @@ function GUI:ShowCVarContextMenu(anchor, cvarData)
         popup.lockBtn:SetBackdropColor(T("BTN_NORMAL"))
     end
 
-    -- Smart position - avoid clipping off screen edges
+    -- Sync scale with main window BEFORE measuring, so the popup's effective
+    -- scale is current when deciding which side to open on
+    do
+        local mainWin = GUI:GetMainWindow()
+        if mainWin then
+            popup:SetScale(mainWin:GetScale())
+        end
+    end
+
+    -- Smart position - avoid clipping off screen edges. Compare in one
+    -- coordinate space (absolute = scale-multiplied): GetRight() is in the
+    -- frame's own scaled space while GetScreenWidth() is in UIParent's, and
+    -- mixing them flipped the popup left with plenty of room on the right.
     popup:ClearAllPoints()
-    local screenWidth = GetScreenWidth() * UIParent:GetEffectiveScale()
-    local anchorRight = anchor:GetRight() or 0
-    if anchorRight + 420 > screenWidth then
+    local screenRight = GetScreenWidth() * UIParent:GetEffectiveScale()
+    local anchorRight = (anchor:GetRight() or 0) * anchor:GetEffectiveScale()
+    local popupWidth = 420 * popup:GetEffectiveScale()
+    if anchorRight + popupWidth > screenRight then
         -- Not enough room on the right, anchor to the left
         popup:SetPoint("TOPRIGHT", anchor, "TOPLEFT", -10, 0)
     else
         popup:SetPoint("TOPLEFT", anchor, "TOPRIGHT", 10, 0)
-    end
-
-    -- Sync scale with main window
-    local mainWin = GUI:GetMainWindow()
-    if mainWin then
-        popup:SetScale(mainWin:GetScale())
     end
 
     -- Apply current font settings to popup text elements

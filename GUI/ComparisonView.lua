@@ -64,31 +64,60 @@ function GUI:ShowComparisonWindow(compareType)
     -- Configure for compare type
     if compareType == "default" then
         CompareWindow.title:SetText("|cff00ff00Compare: Current vs Defaults|r")
-        CompareWindow.compareHeader:SetText("|cffaaaaDefault|r")
+        CompareWindow.compareHeader:SetText("|cffaaaaaaDefault|r")
     else
         CompareWindow.title:SetText("|cff00ff00Compare: Current vs Backup|r")
-        CompareWindow.compareHeader:SetText("|cffaaaaBackup|r")
+        CompareWindow.compareHeader:SetText("|cffaaaaaaBackup|r")
     end
     
     GUI:RefreshComparison(compareType)
     CompareWindow:Show()
 end
 
+---Acquire a pooled row (WoW never GC's frames, so rebuild-per-refresh leaks)
+local function AcquireCompareRow(content, index)
+    CompareWindow.rows = CompareWindow.rows or {}
+    local row = CompareWindow.rows[index]
+    if row then return row end
+
+    row = CreateFrame("Frame", nil, content, "BackdropTemplate")
+    row:SetHeight(24)
+    row:SetBackdrop({bgFile = "Interface\\Buttons\\WHITE8x8"})
+    row:SetBackdropColor(0.08, 0.08, 0.1, 0.8)
+
+    row.nameText = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    row.nameText:SetPoint("LEFT", 4, 0)
+    row.nameText:SetWidth(180)
+    row.nameText:SetJustifyH("LEFT")
+    row.nameText:SetTextColor(0.8, 0.8, 0.8)
+
+    row.currentText = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    row.currentText:SetPoint("LEFT", 190, 0)
+    row.currentText:SetWidth(100)
+    row.currentText:SetTextColor(1, 0.8, 0.3)
+
+    row.compareText = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    row.compareText:SetPoint("LEFT", 300, 0)
+    row.compareText:SetWidth(100)
+    row.compareText:SetTextColor(0.5, 0.5, 0.5)
+
+    row.applyBtn = GUI:CreateButton(nil, row, "Apply", 50, 20)
+    row.applyBtn:SetPoint("RIGHT", -4, 0)
+
+    CompareWindow.rows[index] = row
+    return row
+end
+
 ---Refresh comparison list
 ---@param compareType string "default" or "backup"
 function GUI:RefreshComparison(compareType)
     if not CompareWindow or not CompareWindow.listContent then return end
-    
+
     local content = CompareWindow.listContent
-    
-    -- Clear existing
-    for _, child in pairs({content:GetChildren()}) do
-        child:Hide()
-    end
-    
+
     local cvars = CVarMaster.CVarScanner:GetCachedCVars()
     local differences = {}
-    
+
     for name, data in pairs(cvars) do
         local compareValue
         if compareType == "default" then
@@ -97,66 +126,52 @@ function GUI:RefreshComparison(compareType)
             -- Get from backup
             compareValue = CVarMaster.db.backup and CVarMaster.db.backup[name]
         end
-        
+
         if compareValue and data.value ~= compareValue then
             table.insert(differences, {
                 name = name,
-                friendlyName = data.friendlyName,
+                label = data.friendlyName or name,
                 current = data.value,
                 compare = compareValue
             })
         end
     end
-    
-    table.sort(differences, function(a, b) return a.friendlyName < b.friendlyName end)
-    
+
+    table.sort(differences, function(a, b) return a.label < b.label end)
+
     local yOffset = 0
-    for _, diff in ipairs(differences) do
-        local row = CreateFrame("Frame", nil, content, "BackdropTemplate")
-        row:SetHeight(24)
+    for i, diff in ipairs(differences) do
+        local row = AcquireCompareRow(content, i)
+        row:ClearAllPoints()
         row:SetPoint("TOPLEFT", 0, yOffset)
         row:SetPoint("TOPRIGHT", 0, yOffset)
-        row:SetBackdrop({bgFile = "Interface\\Buttons\\WHITE8x8"})
-        row:SetBackdropColor(0.08, 0.08, 0.1, 0.8)
-        
-        local nameText = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-        nameText:SetPoint("LEFT", 4, 0)
-        nameText:SetWidth(180)
-        nameText:SetJustifyH("LEFT")
-        nameText:SetText(diff.friendlyName)
-        nameText:SetTextColor(0.8, 0.8, 0.8)
-        
-        local currentText = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-        currentText:SetPoint("LEFT", 190, 0)
-        currentText:SetWidth(100)
-        currentText:SetText(diff.current)
-        currentText:SetTextColor(1, 0.8, 0.3)
-        
-        local compareText = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-        compareText:SetPoint("LEFT", 300, 0)
-        compareText:SetWidth(100)
-        compareText:SetText(diff.compare)
-        compareText:SetTextColor(0.5, 0.5, 0.5)
-        
-        local applyBtn = GUI:CreateButton(nil, row, "Apply", 50, 20)
-        applyBtn:SetPoint("RIGHT", -4, 0)
-        applyBtn:SetScript("OnClick", function()
+        row.nameText:SetText(diff.label)
+        row.currentText:SetText(diff.current)
+        row.compareText:SetText(diff.compare)
+        row.applyBtn:SetScript("OnClick", function()
             CVarMaster.CVarManager:SetCVar(diff.name, diff.compare)
-            CVarMaster.CVarScanner:UpdateCVarInCache(diff.name)
             GUI:RefreshComparison(compareType)
             GUI:RefreshCVarList()
         end)
-        
+        row:Show()
         yOffset = yOffset - 26
     end
-    
-    content:SetHeight(math.max(1, math.abs(yOffset)))
-    
-    if #differences == 0 then
-        local noDiff = content:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        noDiff:SetPoint("CENTER")
-        noDiff:SetText("|cff666666No differences found|r")
+
+    -- Hide pooled rows beyond this refresh's count
+    if CompareWindow.rows then
+        for i = #differences + 1, #CompareWindow.rows do
+            CompareWindow.rows[i]:Hide()
+        end
     end
+
+    content:SetHeight(math.max(1, math.abs(yOffset)))
+
+    if not CompareWindow.noDiffText then
+        CompareWindow.noDiffText = content:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        CompareWindow.noDiffText:SetPoint("CENTER")
+        CompareWindow.noDiffText:SetText("|cff666666No differences found|r")
+    end
+    CompareWindow.noDiffText:SetShown(#differences == 0)
     
     -- Configure apply all button
     CompareWindow.applyBtn:SetScript("OnClick", function()

@@ -662,8 +662,15 @@ function GUI:InitMainWindow()
         end
     end)
 
+    local compareBtn = createBtn(nil, bottomBar, "Compare", 80, C.BUTTON_HEIGHT)
+    compareBtn:SetPoint("RIGHT", backupBtn, "LEFT", -S("MD"), 0)
+    compareBtn:SetScript("OnClick", function()
+        local hasBackup = CVarMaster.db and CVarMaster.db.backup
+        GUI:ShowComparisonWindow(hasBackup and "backup" or "default")
+    end)
+
     local modifiedBtn = createBtn(nil, bottomBar, "Modified Only", 110, C.BUTTON_HEIGHT, "ghost")
-    modifiedBtn:SetPoint("RIGHT", backupBtn, "LEFT", -S("MD"), 0)
+    modifiedBtn:SetPoint("RIGHT", compareBtn, "LEFT", -S("MD"), 0)
     modifiedBtn.showModified = false
     modifiedBtn:SetScript("OnClick", function(self)
         self.showModified = not self.showModified
