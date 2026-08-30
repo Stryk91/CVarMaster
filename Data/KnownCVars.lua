@@ -3,9 +3,12 @@ local ADDON_NAME, CVarMaster = ...
 
 -- Comprehensive CVar list, baseline regenerated from a live `/cvm audit`
 -- against WoW retail 12.0.5 (build 2026-05-06), source ConsoleGetAllCommands();
--- then patched through 12.0.7 catalog gaps and the confirmed 12.1.0 diff
+-- then patched through 12.0.7 catalog gaps, the confirmed 12.1.0 diff
 -- (build 68256 -> 69283 via Ketho/BlizzardInterfaceResources: 21 added,
--- 4 removed). Re-run /cvm audit on live 12.1 to re-baseline the count.
+-- 4 removed), and the 2026-08-31 live 12.1 audit (1668 registered at login;
+-- its 11 "missing" folded in, incl. auctionDisplayOnCharacter which the Ketho
+-- diff wrongly called removed). The audit's "deprecated" list is contaminated
+-- by lazy registration (claims nameplateMotion etc.) - never blind-prune it.
 CVarMaster.KnownCVars = {
 	"accessibilityScreenNarrationEnabled",
 	"accessibilityScreenNarrationSpeechRate",
@@ -79,6 +82,7 @@ CVarMaster.KnownCVars = {
 	"AsyncAssistActions",
 	"asyncHandlerTimeout",
 	"asyncThreadSleep",
+	"auctionDisplayOnCharacter",
 	"auctionHouseDurationDropdown",
 	"audioLocale",
 	"AuraDebugger",
@@ -608,6 +612,14 @@ CVarMaster.KnownCVars = {
 	"DeprecatedWarningThrottle",
 	"DepthBasedOpacity",
 	"deselectOnClick",
+	"developerLog",
+	"developerLogFilterDebug",
+	"developerLogFilterError",
+	"developerLogFilterFatal",
+	"developerLogFilterNormal",
+	"developerLogFilterSpam",
+	"developerLogFilterWarning",
+	"developerLogWriteToFile",
 	"digSites",
 	"DisableAdvancedFlyingFullScreenEffects",
 	"DisableAdvancedFlyingVelocityVFX",
@@ -1584,6 +1596,7 @@ CVarMaster.KnownCVars = {
 	"ThreadPoolLimitHP",
 	"ThreadPoolLimitLP",
 	"ThreadPoolLimitMP",
+	"ThreadPoolPerThreadAllocator",
 	"threatPlaySounds",
 	"threatShowNumeric",
 	"threatWarning",
@@ -1658,6 +1671,7 @@ CVarMaster.KnownCVars = {
 	"UnitVisibility",
 	"unlockedExpansionLandingPages",
 	"unlockedMajorFactions",
+	"useBLEEP",
 	"useCommentatorSelectionCircles",
 	"useHighResTextures",
 	"useIPv6",

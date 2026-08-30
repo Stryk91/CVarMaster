@@ -11,6 +11,45 @@ local S = GUI.GetSpacing
 
 
 
+-- Share dialog: created once and reused; every Share click used to spawn a
+-- new unnamed frame with no close button (frames are never GC'd in WoW).
+local shareDialog = nil
+local function ShowShareDialog(profileName, exported)
+    if not shareDialog then
+        local dialog = GUI:CreateNihilumFrame("CVarMasterShareDialog", UIParent, false)
+        dialog:SetSize(400, 120)
+        dialog:SetPoint("CENTER")
+        dialog:SetFrameStrata("FULLSCREEN_DIALOG")
+
+        dialog.title = dialog:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        dialog.title:SetPoint("TOP", 0, -10)
+
+        local closeBtn = GUI:CreateButton(nil, dialog, "X", 22, 22)
+        closeBtn:SetPoint("TOPRIGHT", -6, -6)
+        closeBtn:SetScript("OnClick", function() dialog:Hide() end)
+
+        local editBox = CreateFrame("EditBox", nil, dialog, "InputBoxTemplate")
+        editBox:SetSize(360, 24)
+        editBox:SetPoint("CENTER", 0, 0)
+        editBox:SetAutoFocus(true)
+        editBox:SetScript("OnEscapePressed", function() dialog:Hide() end)
+        dialog.editBox = editBox
+
+        local hint = dialog:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        hint:SetPoint("BOTTOM", 0, 10)
+        hint:SetText("|cff888888Ctrl+C to copy, Escape to close|r")
+
+        tinsert(UISpecialFrames, "CVarMasterShareDialog")
+        shareDialog = dialog
+    end
+
+    shareDialog.title:SetText("|cff00ccffShare Profile: " .. profileName .. "|r")
+    shareDialog.editBox:SetText(exported)
+    shareDialog:Show()
+    shareDialog.editBox:SetFocus()
+    shareDialog.editBox:HighlightText()
+end
+
 -- Custom styled row for profile list
 local function CreateProfileRow(parent, name, yOffset)
     local row = CreateFrame("Frame", nil, parent)
@@ -128,25 +167,7 @@ local function CreateProfileRow(parent, name, yOffset)
     shareBtn:SetScript("OnClick", function()
         local exported = CVarMaster.ProfileManager:ExportProfile(name)
         if exported then
-            -- Show simple copy dialog
-            local dialog = GUI:CreateNihilumFrame(nil, UIParent, false)
-            dialog:SetSize(400, 120)
-            dialog:SetPoint("CENTER")
-            dialog:SetFrameStrata("FULLSCREEN_DIALOG")
-            local title = dialog:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-            title:SetPoint("TOP", 0, -10)
-            title:SetText("|cff00ccffShare Profile: " .. name .. "|r")
-            local editBox = CreateFrame("EditBox", nil, dialog, "InputBoxTemplate")
-            editBox:SetSize(360, 24)
-            editBox:SetPoint("CENTER", 0, 0)
-            editBox:SetText(exported)
-            editBox:SetAutoFocus(true)
-            editBox:HighlightText()
-            editBox:SetScript("OnEscapePressed", function() dialog:Hide() end)
-            local hint = dialog:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-            hint:SetPoint("BOTTOM", 0, 10)
-            hint:SetText("|cff888888Ctrl+C to copy, Escape to close|r")
-            dialog:Show()
+            ShowShareDialog(name, exported)
         end
     end)
     shareBtn:SetScript("OnEnter", function(self)

@@ -31,6 +31,7 @@ CVarMaster.CVarDescriptions = {
     ["assistedCombatReduceHighlights"] = "Reduces the glowing highlights the Assisted Combat (one-button rotation assist) draws on suggested action buttons. Range 0-1. Use it when the rotation-assist glow is distracting but you still want the targeting help — purely visual, no performance cost.",
     ["asyncHandlerTimeout"] = "Async Handler Timeout",
     ["asyncThreadSleep"] = "Async Thread Sleep",
+    ["auctionDisplayOnCharacter"] = "Auction Display On Character",
     ["audioLocale"] = "Audio Locale",
     ["autoAcceptQuickJoinRequests"] = "Auto Accept Quick Join Requests",
     ["autoClearAFK"] = "Auto Clear AFK",

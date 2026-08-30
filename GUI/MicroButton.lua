@@ -100,6 +100,22 @@ local function CreateMicroButton()
     return btn
 end
 
+---Show/hide the micro button immediately and persist the choice
+function CVarMaster:SetMicroButtonShown(show)
+    if CVarMaster.db and CVarMaster.db.global then
+        CVarMaster.db.global.hideMicroBtn = not show
+    end
+    if show then
+        if CVarMasterMicroButton then
+            CVarMasterMicroButton:Show()
+        else
+            self:InitMicroButton()
+        end
+    elseif CVarMasterMicroButton then
+        CVarMasterMicroButton:Hide()
+    end
+end
+
 function CVarMaster:InitMicroButton()
     if CVarMasterMicroButton then return end
     if CVarMaster.db and CVarMaster.db.global and CVarMaster.db.global.hideMicroBtn then return end

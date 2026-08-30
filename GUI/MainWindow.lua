@@ -360,10 +360,16 @@ function GUI:InitMainWindow()
     searchIcon:SetText("|cff666666Search...|r")
     searchBox.placeholder = searchIcon
     
+    -- Debounce: RefreshCVarList re-filters and re-sorts the whole cache, so
+    -- run it 0.15s after the last keystroke instead of on every one.
+    local searchTimer
     searchBox:SetScript("OnTextChanged", function(self)
-        local text = self:GetText()
-        self.placeholder:SetShown(text == "")
-        GUI:RefreshCVarList(text)
+        self.placeholder:SetShown(self:GetText() == "")
+        if searchTimer then searchTimer:Cancel() end
+        searchTimer = C_Timer.NewTimer(0.15, function()
+            searchTimer = nil
+            GUI:RefreshCVarList(self:GetText())
+        end)
     end)
     
     searchBox:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)

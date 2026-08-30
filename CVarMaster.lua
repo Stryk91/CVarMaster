@@ -260,6 +260,11 @@ SlashCmdList["CVARMASTER"] = function(msg)
             print("|cff00aaffCVarMaster:|r Applied " .. (applied or 0) .. " locked CVar(s)." .. note)
         end
 
+    elseif cmd == "button" or cmd == "microbutton" then
+        local hidden = CVarMaster.db and CVarMaster.db.global and CVarMaster.db.global.hideMicroBtn
+        CVarMaster:SetMicroButtonShown(hidden and true or false)
+        print("|cff00aaffCVarMaster:|r Micro button " .. (hidden and "|cff00ff00shown|r" or "|cffff8800hidden|r"))
+
     elseif cmd == "debug" then
         if CVarMaster.db and CVarMaster.db.global then
             CVarMaster.db.global.debug = not CVarMaster.db.global.debug
@@ -314,6 +319,7 @@ SlashCmdList["CVARMASTER"] = function(msg)
         print("  /cvm scan - Rescan all CVars")
         print("  /cvm audit - Diff live client CVars against KnownCVars list")
         print("  /cvm profile - Profile management")
+        print("  /cvm button - Toggle the micro-menu button")
         print("  /cvm help - Show this help")
     else
         print("|cff00aaffCVarMaster|r: /cvm or /cvm help")
@@ -392,7 +398,6 @@ end
 local enforcePending = false
 local hasEnforcedThisSession = false
 local enforceDeferred = false
-local deferHintShown = false
 
 local function IsRiskyContext()
     -- Auto-applying CVars from insecure code while CompactPartyFrame/CompactRaidFrame

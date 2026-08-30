@@ -148,7 +148,7 @@ CVarMaster.CVarCategories = {
         "addonMapRestrictionsForced", "addonPvPMatchRestrictionsForced",
         "advJournalLastOpened",
         "allowCompareWithToggle", "alwaysCompareItems",
-        "auctionHouseDurationDropdown",
+        "auctionDisplayOnCharacter", "auctionHouseDurationDropdown",
         "autoClearAFK",
         "autoCompleteResortNamesOnRecency", "autoCompleteUseContext",
         "autoCompleteWhenEditingFromCenter",
